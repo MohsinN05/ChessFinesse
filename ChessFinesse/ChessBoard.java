@@ -30,7 +30,6 @@ public class ChessBoard extends JPanel {
         setMinimumSize(new Dimension(700,700));
         initializeBoard();
         initializeButtons();
-        System.out.println("done");
     }
 
     public Dimension getPreferredSize(){
