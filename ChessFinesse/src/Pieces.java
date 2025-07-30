@@ -3,7 +3,9 @@ package ChessFinesse.src;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class Pieces {
     Piece[][] board;
@@ -55,16 +57,24 @@ public class Pieces {
     }
 
     void showValidMoves(int i, int j,ChessBoard cb){
-        if(!board[i][j].showPossibleMoves(this, cb, i, j, findKing(cb.match.notTurn()))) 
-        board[i][j].onlyMove(cb);
+        onlyMove(cb,board[i][j].showPossibleMoves(this, cb, i, j));
         cb.buttons[i][j].setBackground(Color.lightGray);
     }
 
-    boolean whichChecking(int i, int j,ChessBoard cb,int[] king){
-        return board[i][j].showPossibleMoves(this, cb, i, j, king);
+    Map<String,ArrayList<Integer[]>> whichChecking(int i, int j,ChessBoard cb){
+        return board[i][j].showPossibleMoves(this, cb, i, j);
     }
 
-
+    public  void onlyMove(ChessBoard cb,Map<String,ArrayList<Integer[]>> moves){
+        String[] keys = new String[]{"Defence", "Attack"};
+        for (String key : keys) {
+            if (moves.containsKey(key)) {
+                for(Integer[] move : moves.get(key)) {
+                        cb.buttons[move[0]][move[1]].setBackground(Color.cyan);
+                }
+            }
+        }
+    }
 
     public HashMap<Integer[],ArrayList<Integer[]>> defendCheck(ChessBoard cb){
         shiftBoard();
@@ -91,14 +101,29 @@ public class Pieces {
         return canSave;
     }
  
-    public ArrayList<int[]> searchForChecks(ChessBoard cb,int[]king){
-        ArrayList<int[]> checking = new ArrayList<>();
+    public Set<Integer[]> searchForChecks(ChessBoard cb){
+        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
+        Set<Integer[]> checking = new HashSet<>();
+        String[] keys = new String[]{"Defence","Neighbor","Check"};
         for (int i = 0; i < BOARD_SIZE; i++) {
             for (int j = 0; j < BOARD_SIZE; j++) {
-                if(getButton(i, j)!=null && !getButton(i, j).team.equals(board[king[0]][king[1]].team)){
-                    if(whichChecking(i,j,cb,king)){
-                        checking.add(new int[]{i,j});
+                if(getButton(i, j) != null && getButton(i, j).team.equals(cb.match.notTurn())){
+                    moves = whichChecking(i, j, cb);
+                    for (String key : keys) {
+                        if(moves.get(key) != null) {
+                        checking.addAll(moves.get(key));
                     }
+                }
+                try{
+
+                    for(Integer[] key : moves.get("Restrict")) {
+                        if (board[key[0]][key[1]] != null) {
+                            checking.addAll(moves.get("Restrict"));
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                }
                 }
             }
         }
@@ -106,31 +131,6 @@ public class Pieces {
     }
 
     
-
-    
-
-    public ArrayList<int[]> coordinateOfChecking(ArrayList<int[]> a){
-        for(int[] i:a){
-            i[0] = 7 - i[0];
-            i[1] = 7 - i[1];
-        }
-        return a;
-    }
-
-    public void hereCheck(int[]king,ArrayList<int[]> a,ChessBoard cb){
-        for(int[] i:a){
-            System.out.printf("%d,%d\n",i[0],i[1]);
-        }
-        for(int i = 1;Math.abs(i)<2;i--){
-            for(int j = 1;Math.abs(j)<2;j--){
-                try{
-                    if((getButton(king[0]+i, king[1]+j)==null || !getButton(king[0]+i, king[1]+j).team.equals(cb.match.turn) || a.contains(new int[]{king[0]+i,king[1]+j})) && (!cb.buttons[king[0]+i][king[1]+j].getBackground().equals(Color.cyan) && !cb.buttons[king[0]+i][king[1]+j].getBackground().equals(Color.red) && !cb.buttons[king[0]+i][king[1]+j].getBackground().equals(Color.orange) && !cb.buttons[king[0]+i][king[1]+j].getBackground().equals(Color.green))){
-                        cb.buttons[king[0]+i][king[1]+j].setBackground(Color.black);
-                    }
-                }catch(Exception e){}      
-            }
-        }
-    }
 
     void shiftBoard(){
         Piece [][] copy1 = new Piece[8][8];
@@ -140,18 +140,6 @@ public class Pieces {
             }
         }
         board = copy1;
-    }
-
-    public int[] findKing(String turn){
-        int i=-1,j = -1;
-        for(i = 0;i<8;i++){
-            for(j = 0;j<8;j++){
-                if(board[i][j]!= null && board[i][j] instanceof King && board[i][j].team.equals(turn)){
-                    return (new int[]{i,j});
-                }
-            }
-        }
-        return (new int[]{i,j});
     }
 
 }

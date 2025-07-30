@@ -1,6 +1,7 @@
 package ChessFinesse.src;
 import javax.swing.*;
 import java.awt.*;
+import java.util.List;
 import java.util.*;
 
 
@@ -23,13 +24,11 @@ abstract class Piece {
 
     public abstract Piece copy();
 
-    public abstract boolean showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z);
+    public abstract Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y);
 
     public abstract ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z);
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
-
-    public abstract int onlyMove(ChessBoard cb);
 
 
     public void update(){
@@ -59,31 +58,60 @@ class King extends Piece{
     }
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
+
+    private Set<List<Integer>> coordinateOfChecking(Set<Integer[]> a){
+        Set<List<Integer>> listSet = new HashSet<>();
+        for(Integer[] i:a){
+            i[0] = 7 - i[0];
+            i[1] = 7 - i[1];
+            listSet.add(Arrays.asList(i));
+        }
+        return listSet;
+    }
     
-    public boolean showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new ArrayList<>());
+        moves.put("Attack", new ArrayList<>());
+        moves.put("Neighbor", new ArrayList<>());
         if(team.equals(cb.match.turn)){
             bo.shiftBoard();
-            z = bo.findKing(team);
-            ArrayList save = bo.searchForChecks(cb, z);
-            cb.shiftButtons();
+            Set<Integer[]> save = bo.searchForChecks(cb);
             bo.shiftBoard();
-            z = bo.findKing(team);
-            bo.hereCheck(z, bo.coordinateOfChecking(save), cb);
-            cb.resetState();
+            Set<List<Integer>> a = coordinateOfChecking(save);
+            for(int i = 1;Math.abs(i)<2;i--){
+                for(int j = 1;Math.abs(j)<2;j--){
+                    try{
+                        if(!a.contains(Arrays.asList(x+i, y+j))){
+                            if((bo.board[x+i][y+j]==null)){
+                                moves.get("Defence").add(new Integer[]{x+i,y+j});
+                            }
+                            else if(!bo.board[x+i][y+j].team.equals(this.team)){
+                                moves.get("Attack").add(new Integer[]{x+i,y+j});
+                            }
+                        }
+                        
+                    }catch(Exception e){}      
+                }
+            }
+            System.out.println(moves);
         }
         else{
             for(int i = 1;Math.abs(i)<2;i--){
                 for(int j = 1;Math.abs(j)<2;j--){
                     if(i == 0 && j == 0)continue;
                     try{
-                        if((bo.board[x+i][y+j]==null || !bo.board[x+i][y+j].team.equals(this.team))){
-                            cb.buttons[x+i][y+j].setBackground(Color.red);
+                        if((bo.board[x+i][y+j]==null)){
+                            moves.get("Defence").add(new Integer[]{x+i,y+j});
+                        }
+                        else if(!bo.board[x+i][y+j].team.equals(this.team)){
+                            moves.get("Attack").add(new Integer[]{x+i,y+j});
                         }
                     }catch(Exception e){}      
                 }
             }
         }
-        return false; 
+        return moves; 
     }
 
     public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
@@ -100,21 +128,6 @@ class King extends Piece{
         return canSave;
     }
 
-    public int onlyMove(ChessBoard cb){
-        int canDo = 0;
-        for(int i =0;i<8;i++){
-            for(int j=0;j<8;j++){
-                if(!cb.buttons[i][j].getBackground().equals(Color.black)){
-                    cb.buttons[i][j].setState(i, j);
-                }
-                else if(cb.buttons[i][j].getBackground().equals(Color.black)){
-                    canDo++;
-                    cb.buttons[i][j].setBackground(Color.CYAN);
-                }
-            }
-        }
-        return canDo;
-    }
 
     public boolean isKing(){
         return true;
@@ -152,20 +165,17 @@ class Pawn extends Piece{
         return "ChessFinesse//Pics&Vids//Pics//b_pawn_1x.png";
     }
 
-    public boolean showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
-        boolean isCheck = false;
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new ArrayList<>());
+        moves.put("Attack", new ArrayList<>());
+        moves.put("Neighbor", new ArrayList<>());
+        moves.put("Check", new ArrayList<>());
         int i = 1;
         while((i<=1+(hasMoved?0:1))&&(x-i>=0)){
-            if(bo.board[x-i][y]==null){
-                if((!cb.buttons[x-i][y].getBackground().equals(Color.red) && !cb.buttons[x-i][y].getBackground().equals(Color.cyan))){
-                    // if((cb.buttons[x-i][y].getBackground().equals(Color.cyan))){
-                    //     isCheck = true;
-                    //     cb.buttons[x-i][y].setBackground(Color.green);
-                    // }
-                    // else
-                    cb.buttons[x-i][y].setBackground(Color.gray);
+            if(bo.board[x-i][y]==null){        
+                    moves.get("Defence").add(new Integer[]{x-i,y});
                 }
-            }
             else{
                 break;
             }
@@ -173,42 +183,35 @@ class Pawn extends Piece{
         }
         try{
             if(x-1 >= 0 && y+1<8){
-                try{
-                    if(!bo.board[x-1][y+1].team.equals(this.team)){
-                        if((x-1)==z[0] && (y+1)==z[1]){
-                            cb.buttons[x-1][y+1].setBackground(Color.cyan);
-                            isCheck = true;
-                        }
-                        else
-                        cb.buttons[x-1][y+1].setBackground(Color.green);
+                if(bo.board[x-1][y+1]==null || bo.board[x-1][y+1].team.equals(this.team)){
+                    moves.get("Neighbor").add(new Integer[]{x-1,y+1});
+                }
+                else{
+                    if(bo.board[x-1][y+1].getClass().equals(King.class)){
+                        moves.get("Check").add(new Integer[]{x-1,y+1});
                     }
-                    else
-                    cb.buttons[x-1][y+1].setBackground(Color.orange);
-                }catch(Exception e){
-                    if(!cb.buttons[x-1][y+1].getBackground().equals(Color.cyan))
-                    cb.buttons[x-1][y+1].setBackground(Color.red);}
+                    else{
+                        moves.get("Attack").add(new Integer[]{x-1,y+1});
+                    }
+                }          
             }
         }catch(ArrayIndexOutOfBoundsException e){}
         try{
             if(x-1 >= 0 && y-1>=0){
-                try{
-                    if(!bo.board[x-1][y-1].team.equals(this.team)){
-                        if((x-1)==z[0] && (y-1)==z[1]){
-                            cb.buttons[x-1][y-1].setBackground(Color.cyan);
-                            isCheck = true;
-                        }
-                        else
-                        cb.buttons[x-1][y-1].setBackground(Color.green);
+                if(bo.board[x-1][y-1]==null || bo.board[x-1][y-1].team.equals(this.team)){
+                    moves.get("Neighbor").add(new Integer[]{x-1,y-1});
+                }
+                else{
+                    if(bo.board[x-1][y-1].getClass().equals(King.class)){
+                        moves.get("Check").add(new Integer[]{x-1,y-1});
                     }
-                    else
-                    cb.buttons[x-1][y-1].setBackground(Color.orange);
-                }catch(Exception e){
-                    if(!cb.buttons[x-1][y-1].getBackground().equals(Color.cyan))
-                    cb.buttons[x-1][y-1].setBackground(Color.red);
+                    else{
+                        moves.get("Attack").add(new Integer[]{x-1,y-1});
+                    }
                 }
             }
         }catch(ArrayIndexOutOfBoundsException e){}
-        return isCheck;
+        return moves;
     }
 
     public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
@@ -244,22 +247,6 @@ class Pawn extends Piece{
     private void pawnPromotion(ChessBoard cb,Pieces pi,int x,int y){
         cb.safe.promo = new Promotion(cb,team,pi,x,y);
     }
-
-    public int onlyMove(ChessBoard cb){
-        int canDo = 0;
-        for(int i =0;i<8;i++){
-            for(int j=0;j<8;j++){
-                if(cb.buttons[i][j].getBackground().equals(Color.gray) || cb.buttons[i][j].getBackground().equals(Color.green)){
-                    canDo++;
-                    cb.buttons[i][j].setBackground(Color.CYAN);
-                }
-                else if(cb.buttons[i][j].getBackground().equals(Color.red) || cb.buttons[i][j].getBackground().equals(Color.orange)){
-                    cb.buttons[i][j].setState(i, j);
-                }
-            }
-        }
-        return canDo;
-    }
 }
 
 class Knight extends Pawn{
@@ -285,26 +272,34 @@ class Knight extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public boolean showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
-        boolean isCheck = false;
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new ArrayList<>());
+        moves.put("Attack", new ArrayList<>());
+        moves.put("Neighbor", new ArrayList<>());
+        moves.put("Check", new ArrayList<>());
         for(int i = 2;Math.abs(i)<=2;i--){
             for(int j = 2;Math.abs(j)<=2;j--){
                 if(Math.abs(i) == Math.abs(j) || i == 0 || j == 0)continue;
                 try{
-                    if(bo.board[x+i][y+j]==null ||  !bo.board[x+i][y+j].team.equals(this.team)){
-                        if((x+i)==z[0] && (y+j)==z[1]){
-                            cb.buttons[x+i][y+j].setBackground(Color.cyan);
-                            isCheck = true;
-                        }
-                        else if(!cb.buttons[x+i][y+j].getBackground().equals(Color.cyan) && !cb.buttons[x+i][y+j].getBackground().equals(Color.yellow))
-                        cb.buttons[x+i][y+j].setBackground(Color.red);
+                    if(bo.board[x+i][y+j]==null){
+                        moves.get("Defence").add(new Integer[]{x+i,y+j});
                     }
-                    else if(!cb.buttons[x+i][y+j].getBackground().equals(Color.cyan))
-                    cb.buttons[x+i][y+j].setBackground(Color.orange);
+                    else if(bo.board[x+i][y+j].team.equals(this.team)){
+                        moves.get("Neighbor").add(new Integer[]{x+i,y+j});
+                    }
+                    else{
+                        if(bo.board[x+i][y+j].getClass().equals(King.class)){
+                            moves.get("Check").add(new Integer[]{x+i,y+j});
+                        }
+                        else{
+                            moves.get("Attack").add(new Integer[]{x+i,y+j});
+                        }
+                    }
                 }catch(Exception e){}
             }
         }
-        return isCheck;
+        return moves;
     }
 
     public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
@@ -321,20 +316,6 @@ class Knight extends Pawn{
         return saving;
     }
 
-    public int onlyMove(ChessBoard cb){
-        int canDo = 0;
-        for(int i =0;i<8;i++){
-            for(int j=0;j<8;j++){
-                if(cb.buttons[i][j].getBackground().equals(Color.red)){
-                    canDo++;
-                    cb.buttons[i][j].setBackground(Color.CYAN);
-                }
-                else
-                cb.buttons[i][j].setState(i, j);
-            }
-        }
-        return canDo;
-    }
 }
 
 class Queen extends Pawn{
@@ -361,425 +342,536 @@ class Queen extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public boolean showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new ArrayList<>());
+        moves.put("Attack", new ArrayList<>());
+        moves.put("Neighbor", new ArrayList<>());
+        moves.put("Check", new ArrayList<>());
+        moves.put("Restrict", new ArrayList<>());
+        ArrayList<Integer[]> hL = new ArrayList<>(), hR = new ArrayList<>(), vU = new ArrayList<>(), vD = new ArrayList<>(), rU = new ArrayList<>(), rD = new ArrayList<>(), lU = new ArrayList<>(), lD = new ArrayList<>();
         boolean isCheckhLeft=false,isCheckhRight = false,isCheckvUp=false,isCheckvDown=false,isCheckrightUp=false,isCheckrightDown=false,isCheckleftUp=false,isCheckleftDown=false;
         boolean CheckvUp=false,CheckvDown=false,CheckhLeft=false,CheckhRight = false;
         boolean vUp=true,vDown=true,hLeft=true,hRight = true;
         boolean CheckleftUp=false,CheckleftDown=false,CheckrightUp=false,CheckrightDown = false;
         boolean leftUp=true,leftDown=true,rightUp=true,rightDown = true;
-        boolean hasPassed = false;
-        boolean hasPassed1 = false,hasPassed2 = false, hasPassed3 = false,hasPassed4 = false, hasPassed5 = false,hasPassed6 = false, hasPassed7 = false,hasPassed8 = false;
-        for(int i = 1;i<8;i++){
+        
+        for(int i = 1;i<=8;i++){
             try{
-                if((y+i < 8)&&hRight){
+                if(hRight){
                     if(bo.board[x][y+i]!=null){
                         if(bo.board[x][y+i].team.equals(this.team)){
                             hRight = false;
-                            if(!cb.buttons[x][y+i].getBackground().equals(Color.cyan))
-                            cb.buttons[x][y+i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x,y+i});
+                            moves.get("Defence").addAll(hR);
+                            hR.clear();
                         }
                         else{
-                            if(((x)==z[0] && (y+i)==z[1])){
-                                if(!isCheckhRight){
-                                    i = 0;
+                            if(bo.board[x][y+i].getClass().equals(King.class)){
+                                if(!CheckhRight){
+                                    moves.get("Check").add(new Integer[]{x,y+i});
+                                    moves.get("Check").addAll(hR);
+                                    hR.clear();
                                     isCheckhRight = true;
-                                    continue;
-                                }
-                                else if(isCheckhRight && CheckhRight){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckhRight = false;
-                                    hRight = false;
                                 }
                                 else{
-                                    cb.buttons[x][y+i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    hRight = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x,y+i-j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x,y+i-j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckhRight && !CheckhRight){
+                                if(!CheckhRight){
+                                    CheckhRight = true;
+                                    moves.get("Attack").add(new Integer[]{x,y+i});
+                                    moves.get("Defence").addAll(hR);
+                                }
+                                else{
+                                    if(isCheckhRight){
+                                    moves.get("Restrict").addAll(hR);
+                                    }
                                     hRight = false;
                                 }
-                                else if(isCheckhRight){
-                                    cb.buttons[x][y+i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed1)
-                                else if(CheckhRight)
-                                hRight = false;
-                                else{
-                                    CheckhRight = true;
-                                    if(!cb.buttons[x][y+i].getBackground().equals(Color.cyan) && !cb.buttons[x][y+i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x][y+i].setBackground(Color.red);
-                                }
-                            }
+                                hR.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckhRight && !hasPassed)
-                        cb.buttons[x][y+i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x][y+i].getBackground().equals(Color.cyan))
-                        cb.buttons[x][y+i].setBackground(Color.red);
+                        hR.add(new Integer[]{x,y+i});
                     }
-                }else{hRight=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckhRight){
+                    moves.get("Restrict").addAll(hR);
+                }
+                else if(!CheckhRight){
+                    moves.get("Defence").addAll(hR);
+                }
+                hR.clear();
+                hRight=false;
+            }
             try{
-                if((y-i >= 0)&&hLeft){
+                if(hLeft){
                     if(bo.board[x][y-i]!=null){
                         if(bo.board[x][y-i].team.equals(this.team)){
                             hLeft = false;
-                            if(!cb.buttons[x][y-i].getBackground().equals(Color.cyan))
-                            cb.buttons[x][y-i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x,y-i});
+                            moves.get("Defence").addAll(hL);
+                            hL.clear();
                         }
                         else{
-                            if(((x)==z[0] && (y-i)==z[1])){
-                                if(!isCheckhLeft){
-                                    i = 0;
+                            if(bo.board[x][y-i].getClass().equals(King.class)){
+                                if(!CheckhLeft){
+                                    moves.get("Check").add(new Integer[]{x,y-i});
+                                    moves.get("Check").addAll(hL);
+                                    hL.clear();
                                     isCheckhLeft = true;
-                                    continue;
-                                }
-                                else if(isCheckhLeft && CheckhLeft){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckhLeft = false;
-                                    hLeft = false;
                                 }
                                 else{
-                                    cb.buttons[x][y-i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    hLeft = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x,y-i+j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x,y-i+j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckhLeft && !CheckhLeft){
-                                    hLeft = false;
-                                }
-                                else if(isCheckhLeft){
-                                    cb.buttons[x][y-i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed2)
-                                else if(CheckhLeft)
-                                hLeft = false;
-                                else{
+                                if(!CheckhLeft){
                                     CheckhLeft = true;
-                                    if(!cb.buttons[x][y-i].getBackground().equals(Color.cyan) && !cb.buttons[x][y-i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x][y-i].setBackground(Color.red);
-                                }
-                            }
+                                    moves.get("Attack").add(new Integer[]{x,y-i});
+                                    moves.get("Defence").addAll(hL);}
+                                else{
+                                    if(isCheckhLeft){
+                                        moves.get("Restrict").addAll(hL);}
+                                    hLeft = false;
+                                } 
+                                hL.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckhLeft && !hasPassed)
-                        cb.buttons[x][y-i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x][y-i].getBackground().equals(Color.cyan))
-                        cb.buttons[x][y-i].setBackground(Color.red);
+                        hL.add(new Integer[]{x,y-i});
                     }
-                }else{hLeft=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckhLeft){
+                    moves.get("Restrict").addAll(hL);
+                }
+                else if(!CheckhLeft){
+                    moves.get("Defence").addAll(hL);
+                }
+                hL.clear();
+                hLeft=false;
+            }
             try{
-                if((x+i<8)&&vUp){
+                if(vUp){
                     if(bo.board[x+i][y]!=null){
                         if(bo.board[x+i][y].team.equals(this.team)){
                             vUp = false;
-                            if(!cb.buttons[x+i][y].getBackground().equals(Color.cyan))
-                            cb.buttons[x+i][y].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x+i,y});
+                            moves.get("Defence").addAll(vU);
+                            vU.clear();
                         }
                         else{
-                            if(((x+i)==z[0] && (y)==z[1])){
-                                if(!isCheckvUp){
-                                    i = 0;
+                            if(bo.board[x+i][y].getClass().equals(King.class)){
+                                if(!CheckvUp){
+                                    moves.get("Check").add(new Integer[]{x+i,y});
+                                    moves.get("Check").addAll(vU);
+                                    vU.clear();
                                     isCheckvUp = true;
-                                    continue;
-                                }
-                                else if(isCheckvUp && CheckvUp){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckvUp = false;
-                                    vUp = false;
                                 }
                                 else{
-                                    cb.buttons[x+i][y].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    vUp = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x+i-j,y})) {
+                                                    moves.get("Restrict").add(new Integer[]{x+i-j,y});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckvUp && !CheckvUp){
+                                if(!CheckvUp){
+                                    CheckvUp = true;
+                                    moves.get("Attack").add(new Integer[]{x+i,y});
+                                    moves.get("Defence").addAll(vU);}
+                                else{
+                                    if(isCheckvUp){
+                                        moves.get("Restrict").addAll(vU);
+                                    }
                                     vUp = false;
                                 }
-                                else if(isCheckvUp){
-                                    cb.buttons[x+i][y].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed3)
-                                else if(CheckvUp)
-                                vUp = false;
-                                else{
-                                    CheckvUp = true;
-                                    if(!cb.buttons[x+i][y].getBackground().equals(Color.cyan) && !cb.buttons[x+i][y].getBackground().equals(Color.yellow))
-                                    cb.buttons[x+i][y].setBackground(Color.red);
-                                }
-                            }
+                                vU.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckvUp && !hasPassed)
-                        cb.buttons[x+i][y].setBackground(Color.cyan);
-                        else if(!cb.buttons[x+i][y].getBackground().equals(Color.cyan))
-                        cb.buttons[x+i][y].setBackground(Color.red);
+                        vU.add(new Integer[]{x+i,y});
                     }
-                }else{vUp=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckvUp){
+                    moves.get("Restrict").addAll(vU);
+                }
+                else if(!CheckvUp){
+                    moves.get("Defence").addAll(vU);
+                }
+                vU.clear();
+                vUp=false;
+            }
             try{
-                if((x - i >= 0)&&vDown){
+                if(vDown){
                     if(bo.board[x-i][y]!=null){
                         if(bo.board[x-i][y].team.equals(this.team)){
                             vDown = false;
-                            if(!cb.buttons[x-i][y].getBackground().equals(Color.cyan))
-                            cb.buttons[x-i][y].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x-i,y});
+                            moves.get("Defence").addAll(vD);
+                            vD.clear();
                         }
                         else{
-                            if(((x-i)==z[0] && (y)==z[1])){
-                                if(!isCheckvDown){
-                                    i = 0;
+                            if(bo.board[x-i][y].getClass().equals(King.class)){
+                                if(!CheckvDown){
+                                    moves.get("Check").add(new Integer[]{x-i,y});
+                                    moves.get("Check").addAll(vD);
+                                    vD.clear();
                                     isCheckvDown = true;
-                                    continue;
-                                }
-                                else if(isCheckvDown && CheckvDown){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckvDown = false;
-                                    CheckvDown = false;
                                 }
                                 else{
-                                    cb.buttons[x-i][y].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    vDown = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x-i+j,y})) {
+                                                    moves.get("Restrict").add(new Integer[]{x-i+j,y});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckvDown && !CheckvDown){
-                                    vDown = false;
-                                }
-                                else if(isCheckvDown){
-                                    cb.buttons[x-i][y].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed4)
-                                else if(CheckvDown)
-                                vDown = false;
-                                else{
+                                if(!CheckvDown){
                                     CheckvDown = true;
-                                    if(!cb.buttons[x-i][y].getBackground().equals(Color.cyan) && !cb.buttons[x-i][y].getBackground().equals(Color.yellow))
-                                    cb.buttons[x-i][y].setBackground(Color.red);
-                                }
-                            }
+                                    moves.get("Attack").add(new Integer[]{x-i,y});
+                                    moves.get("Defence").addAll(vD);}
+                                else{
+                                    if(isCheckvDown){
+                                        moves.get("Restrict").addAll(vD);}
+                                    vDown = false;
+                                    }
+                                    vD.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckvDown && !hasPassed)
-                        cb.buttons[x-i][y].setBackground(Color.cyan);
-                        else if(!cb.buttons[x-i][y].getBackground().equals(Color.cyan))
-                        cb.buttons[x-i][y].setBackground(Color.red);
+                        vD.add(new Integer[]{x-i,y});
                     }
-                }else{vDown=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckvDown){
+                    moves.get("Restrict").addAll(vD);
+                }
+                else if(!CheckvDown){
+                    moves.get("Defence").addAll(vD);
+                }
+                vD.clear();
+                vDown=false;
+            }
             try{
-                if((x+i < 8&&y+i < 8)&&rightUp){
+                if(rightUp){
                     if(bo.board[x+i][y+i]!=null){
                         if(bo.board[x+i][y+i].team.equals(this.team)){
                             rightUp = false;
-                            if(!cb.buttons[x+i][y+i].getBackground().equals(Color.cyan))
-                            cb.buttons[x+i][y+i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x+i,y+i});
+                            moves.get("Defence").addAll(rU);
+                            rU.clear();
                         }
                         else{
-                            if(((x+i)==z[0] && (y+i)==z[1])){
-                                if(!isCheckrightUp){
-                                    i = 0;
+                            if(bo.board[x+i][y+i].getClass().equals(King.class)){
+                                if(!CheckrightUp){
+                                    moves.get("Check").add(new Integer[]{x+i,y+i});
+                                    moves.get("Check").addAll(rU);
+                                    rU.clear();
                                     isCheckrightUp = true;
-                                    continue;
-                                }
-                                else if(isCheckrightUp && CheckrightUp){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckrightUp = false;
-                                    rightUp = false;
                                 }
                                 else{
-                                    cb.buttons[x+i][y+i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    rightUp = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x+i-j,y+i-j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x+i-j,y+i-j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckrightUp && !CheckrightUp){
+                                if(!CheckrightUp){
+                                    CheckrightUp = true;
+                                    moves.get("Attack").add(new Integer[]{x+i,y+i});
+                                    moves.get("Defence").addAll(rU);}
+                                else{
+                                    if(isCheckrightUp){
+                                        moves.get("Restrict").addAll(rU);
+                                    }
                                     rightUp = false;
                                 }
-                                else if(isCheckrightUp){
-                                    cb.buttons[x+i][y+i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed5)
-                                else if(CheckrightUp)
-                                rightUp = false;
-                                else{
-                                    CheckrightUp = true;
-                                    if(!cb.buttons[x+i][y+i].getBackground().equals(Color.cyan) && !cb.buttons[x+i][y+i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x+i][y+i].setBackground(Color.red);
-                                }
-                            }
+                                rU.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckrightUp && !hasPassed)
-                        cb.buttons[x+i][y+i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x+i][y+i].getBackground().equals(Color.cyan))
-                        cb.buttons[x+i][y+i].setBackground(Color.red);
+                        rU.add(new Integer[]{x+i,y+i});
                     }
-                }else{rightUp=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckrightUp){
+                    moves.get("Restrict").addAll(rU);
+                }
+                else if(!CheckrightUp){
+                    moves.get("Defence").addAll(rU);
+                }
+                rU.clear();
+                rightUp=false;
+            }
             try{
-                if((y-i >= 0&&x+i<8)&&leftDown){
+                if(leftDown){
                     if(bo.board[x+i][y-i]!=null){
                         if(bo.board[x+i][y-i].team.equals(this.team)){
                             leftDown = false;
-                            if(!cb.buttons[x+i][y-i].getBackground().equals(Color.cyan))
-                            cb.buttons[x+i][y-i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x+i,y-i});
+                            moves.get("Defence").addAll(lD);
+                            lD.clear();
                         }
                         else{
-                            if(((x+i)==z[0] && (y-i)==z[1])){
-                                if(!isCheckleftDown){
-                                    i = 0;
+                            if(bo.board[x+i][y-i].getClass().equals(King.class)){
+                                if(!CheckleftDown){
+                                    moves.get("Check").add(new Integer[]{x+i,y-i});
+                                    moves.get("Check").addAll(lD);
+                                    lD.clear();
                                     isCheckleftDown = true;
-                                    continue;
-                                }
-                                else if(isCheckleftDown && CheckleftDown){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckleftDown = false;
-                                    leftDown = false;
                                 }
                                 else{
-                                    cb.buttons[x+i][y-i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    leftDown = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x+i-j,y-i+j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x+i-j,y-i+j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckleftDown && !CheckleftDown){
+                                if(!CheckleftDown){
+                                    CheckleftDown = true;
+                                    moves.get("Attack").add(new Integer[]{x+i,y-i});
+                                    moves.get("Defence").addAll(lD);
+                                }
+                                else{
+                                    if(isCheckleftDown){
+                                        moves.get("Restrict").addAll(lD);
+                                    }
                                     leftDown = false;
                                 }
-                                else if(isCheckleftDown){
-                                    cb.buttons[x+i][y-i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed6)
-                                else if(CheckleftDown)
-                                leftDown = false;
-                                else{
-                                    CheckleftDown = true;
-                                    if(!cb.buttons[x+i][y-i].getBackground().equals(Color.cyan) && !cb.buttons[x+i][y-i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x+i][y-i].setBackground(Color.red);
-                                }
-                            }
+                                lD.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckleftDown && !hasPassed)
-                        cb.buttons[x+i][y-i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x+i][y-i].getBackground().equals(Color.cyan))
-                        cb.buttons[x+i][y-i].setBackground(Color.red);
+                        lD.add(new Integer[]{x+i,y-i});
                     }
-                }else{leftDown=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckleftDown){
+                    moves.get("Restrict").addAll(lD);
+                }
+                else if(!CheckleftDown){
+                    moves.get("Defence").addAll(lD);
+                }
+                lD.clear();
+                leftDown=false;
+            }
             try{
-                if((y+i<8&&x-i>=0)&&leftUp){
+                if(leftUp){
                     if(bo.board[x-i][y+i]!=null){
                         if(bo.board[x-i][y+i].team.equals(this.team)){
                             leftUp = false;
-                            if(!cb.buttons[x-i][y+i].getBackground().equals(Color.cyan))
-                            cb.buttons[x-i][y+i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x-i,y+i});
+                            moves.get("Defence").addAll(lU);
+                            lU.clear();
                         }
                         else{
-                            if(((x-i)==z[0] && (y+i)==z[1])){
-                                if(!isCheckleftUp){
-                                    i = 0;
+                            if(bo.board[x-i][y+i].getClass().equals(King.class)){
+                                if(!CheckleftUp){
+                                    moves.get("Check").add(new Integer[]{x-i,y+i});
+                                    moves.get("Check").addAll(lU);
+                                    lU.clear();
                                     isCheckleftUp = true;
-                                    continue;
-                                }
-                                else if(isCheckleftUp && CheckleftUp){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckleftUp = false;
-                                    leftUp = false;
                                 }
                                 else{
-                                    cb.buttons[x-i][y+i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    leftUp = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x-i+j,y+i-j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x-i+j,y+i-j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckleftUp && !CheckleftUp){
+                                if(!CheckleftUp){
+                                    CheckleftUp = true;
+                                    moves.get("Attack").add(new Integer[]{x-i,y+i});
+                                    moves.get("Defence").addAll(lU);
+                                }
+                                else{
+                                    if(isCheckleftUp){
+                                        moves.get("Restrict").addAll(lU);
+                                    }
                                     leftUp = false;
                                 }
-                                else if(isCheckleftUp){
-                                    cb.buttons[x-i][y+i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed7)
-                                else if(CheckleftUp)
-                                leftUp = false;
-                                else{
-                                    CheckleftUp = true;
-                                    if(!cb.buttons[x-i][y+i].getBackground().equals(Color.cyan) && !cb.buttons[x-i][y+i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x-i][y+i].setBackground(Color.red);
-                                }
-                            }
+                                lU.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckleftUp && !hasPassed)
-                        cb.buttons[x-i][y+i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x-i][y+i].getBackground().equals(Color.cyan))
-                        cb.buttons[x-i][y+i].setBackground(Color.red);
+                        lU.add(new Integer[]{x-i,y+i});
                     }
-                }else{leftUp=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckleftUp){
+                    moves.get("Restrict").addAll(lU);
+                }
+                else if(!CheckleftUp){
+                    moves.get("Defence").addAll(lU);
+                }
+                lU.clear();
+                leftUp=false;
+            }
             try{
-                if((x - i >= 0&&y-i>=0)&&rightDown){
+                if(rightDown){
                     if(bo.board[x-i][y-i]!=null){
                         if(bo.board[x-i][y-i].team.equals(this.team)){
                             rightDown = false;
-                            if(!cb.buttons[x-i][y-i].getBackground().equals(Color.cyan))
-                            cb.buttons[x-i][y-i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x-i,y-i});
+                            moves.get("Defence").addAll(rD);
+                            rD.clear();
                         }
                         else{
-                            if(((x-i)==z[0] && (y-i)==z[1])){
-                                if(!isCheckrightDown){
-                                    i = 0;
+                            if(bo.board[x-i][y-i].getClass().equals(King.class)){
+                                if(!CheckrightDown){
+                                    moves.get("Check").add(new Integer[]{x-i,y-i});
+                                    moves.get("Check").addAll(rD);
+                                    rD.clear();
                                     isCheckrightDown = true;
-                                    continue;
-                                }
-                                else if(isCheckrightDown && CheckrightDown){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckrightDown = false;
-                                    rightDown = false;
                                 }
                                 else{
-                                    cb.buttons[x-i][y-i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    rightDown = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x-i+j,y-i+j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x-i+j,y-i+j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckrightDown && !CheckrightDown){
+                                if(!CheckrightDown){
+                                    CheckrightDown = true;
+                                    moves.get("Attack").add(new Integer[]{x-i,y-i});
+                                    moves.get("Defence").addAll(rD);}
+                                else{
+                                    if(isCheckrightDown){
+                                        moves.get("Restrict").addAll(rD);
+                                    }
                                     rightDown = false;
                                 }
-                                else if(isCheckrightDown){
-                                    cb.buttons[x-i][y-i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed8)
-                                else if(CheckrightDown)
-                                rightDown = false;
-                                else{
-                                    CheckrightDown = true;
-                                    if(!cb.buttons[x-i][y-i].getBackground().equals(Color.cyan) && !cb.buttons[x-i][y-i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x-i][y-i].setBackground(Color.red);
-                                }
-                            }
+                                rD.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckrightDown && !hasPassed)
-                        cb.buttons[x-i][y-i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x-i][y-i].getBackground().equals(Color.cyan))
-                        cb.buttons[x-i][y-i].setBackground(Color.red);
+                        rD.add(new Integer[]{x-i,y-i});
                     }
-                }else{rightDown=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckrightDown){
+                    moves.get("Restrict").addAll(rD);
+                }
+                else if(!CheckrightDown){
+                    moves.get("Defence").addAll(rD);
+                }
+                rD.clear();
+                rightDown=false;
+            }
         } 
-        return (isCheckhLeft || isCheckhRight || isCheckvUp || isCheckvDown || isCheckleftDown || isCheckleftUp || isCheckrightDown || isCheckrightUp);
+        return moves;
     }
 
     public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
@@ -871,21 +963,6 @@ class Queen extends Pawn{
         return saving;
     }
 
-    public int onlyMove(ChessBoard cb){
-        int canDo = 0;
-        for(int i =0;i<8;i++){
-            for(int j=0;j<8;j++){
-                if(cb.buttons[i][j].getBackground().equals(Color.red) || cb.buttons[i][j].getBackground().equals(Color.cyan) || cb.buttons[i][j].getBackground().equals(Color.yellow)){
-                    canDo++;
-                    cb.buttons[i][j].setBackground(Color.CYAN);
-                }
-                else{
-                    cb.buttons[i][j].setState(i, j);
-                }
-            }
-        }
-        return canDo;
-    }
 }
 
 class Rook extends Pawn{
@@ -911,219 +988,275 @@ class Rook extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public boolean showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
-        boolean isCheckhLeft=false,isCheckhRight=false,isCheckvDown=false,isCheckvUp=false;
-        boolean hasPassed1 = false,hasPassed2 = false, hasPassed3 = false,hasPassed4 = false;
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new ArrayList<>());
+        moves.put("Attack", new ArrayList<>());
+        moves.put("Neighbor", new ArrayList<>());
+        moves.put("Check", new ArrayList<>());
+        moves.put("Restrict", new ArrayList<>());
+        ArrayList<Integer[]> hL = new ArrayList<>(), hR = new ArrayList<>(), vU = new ArrayList<>(), vD = new ArrayList<>();
+        boolean isCheckhLeft=false,isCheckhRight = false,isCheckvUp=false,isCheckvDown=false;
         boolean CheckvUp=false,CheckvDown=false,CheckhLeft=false,CheckhRight = false;
         boolean vUp=true,vDown=true,hLeft=true,hRight = true;
-        boolean hasPassed = false;
-        for(int i = 1;i<8;i++){
+        for(int i = 1;i<=8;i++){
             try{
-                if((y+i < 8)&&hRight){
+                if(hRight){
                     if(bo.board[x][y+i]!=null){
                         if(bo.board[x][y+i].team.equals(this.team)){
                             hRight = false;
-                            if(!cb.buttons[x][y+i].getBackground().equals(Color.cyan))
-                            cb.buttons[x][y+i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x,y+i});
+                            moves.get("Defence").addAll(hR);
+                            hR.clear();
                         }
                         else{
-                            if(((x)==z[0] && (y+i)==z[1])){
-                                if(!isCheckhRight){
-                                    i = 0;
+                            if(bo.board[x][y+i].getClass().equals(King.class)){
+                                if(!CheckhRight){
+                                    moves.get("Check").add(new Integer[]{x,y+i});
+                                    moves.get("Check").addAll(hR);
+                                    hR.clear();
                                     isCheckhRight = true;
-                                    continue;
-                                }
-                                else if(isCheckhRight && CheckhRight){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckhRight = false;
-                                    hRight = false;
                                 }
                                 else{
-                                    cb.buttons[x][y+i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    hRight = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x,y+i-j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x,y+i-j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckhRight && !CheckhRight){
+                                if(!CheckhRight){
+                                    CheckhRight = true;
+                                    moves.get("Attack").add(new Integer[]{x,y+i});
+                                    moves.get("Defence").addAll(hR);
+                                }
+                                else{
+                                    if(isCheckhRight){
+                                    moves.get("Restrict").addAll(hR);
+                                    }
                                     hRight = false;
                                 }
-                                else if(isCheckhRight){
-                                    cb.buttons[x][y+i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed1)
-                                else if(CheckhRight)
-                                hRight = false;
-                                else{
-                                    CheckhRight = true;
-                                    if(!cb.buttons[x][y+i].getBackground().equals(Color.cyan) && !cb.buttons[x][y+i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x][y+i].setBackground(Color.red);
-                                }
-                            }
+                                hR.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckhRight && !hasPassed)
-                        cb.buttons[x][y+i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x][y+i].getBackground().equals(Color.cyan))
-                        cb.buttons[x][y+i].setBackground(Color.red);
+                        hR.add(new Integer[]{x,y+i});
                     }
-                }else{hRight=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckhRight){
+                    moves.get("Restrict").addAll(hR);
+                }
+                else if(!CheckhRight){
+                    moves.get("Defence").addAll(hR);
+                }
+                hR.clear();
+                hRight=false;
+            }
             try{
-                if((y-i >= 0)&&hLeft){
+                if(hLeft){
                     if(bo.board[x][y-i]!=null){
                         if(bo.board[x][y-i].team.equals(this.team)){
                             hLeft = false;
-                            if(!cb.buttons[x][y-i].getBackground().equals(Color.cyan))
-                            cb.buttons[x][y-i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x,y-i});
+                            moves.get("Defence").addAll(hL);
+                            hL.clear();
                         }
                         else{
-                            if(((x)==z[0] && (y-i)==z[1])){
-                                if(!isCheckhLeft){
-                                    i = 0;
+                            if(bo.board[x][y-i].getClass().equals(King.class)){
+                                if(!CheckhLeft){
+                                    moves.get("Check").add(new Integer[]{x,y-i});
+                                    moves.get("Check").addAll(hL);
+                                    hL.clear();
                                     isCheckhLeft = true;
-                                    continue;
-                                }
-                                else if(isCheckhLeft && CheckhLeft){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckhLeft = false;
-                                    hLeft = false;
                                 }
                                 else{
-                                    cb.buttons[x][y-i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    hLeft = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x,y-i+j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x,y-i+j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckhLeft && !CheckhLeft){
-                                    hLeft = false;
-                                }
-                                else if(isCheckhLeft){
-                                    cb.buttons[x][y-i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed2)
-                                else if(CheckhLeft)
-                                hLeft = false;
-                                else{
+                                if(!CheckhLeft){
                                     CheckhLeft = true;
-                                    if(!cb.buttons[x][y-i].getBackground().equals(Color.cyan) && !cb.buttons[x][y-i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x][y-i].setBackground(Color.red);
-                                }
-                            }
+                                    moves.get("Attack").add(new Integer[]{x,y-i});
+                                    moves.get("Defence").addAll(hL);}
+                                else{
+                                    if(isCheckhLeft){
+                                        moves.get("Restrict").addAll(hL);}
+                                    hLeft = false;
+                                } 
+                                hL.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckhLeft && !hasPassed)
-                        cb.buttons[x][y-i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x][y-i].getBackground().equals(Color.cyan))
-                        cb.buttons[x][y-i].setBackground(Color.red);
+                        hL.add(new Integer[]{x,y-i});
                     }
-                }else{hLeft=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckhLeft){
+                    moves.get("Restrict").addAll(hL);
+                }
+                else if(!CheckhLeft){
+                    moves.get("Defence").addAll(hL);
+                }
+                hL.clear();
+                hLeft=false;
+            }
             try{
-                if((x+i<8)&&vUp){
+                if(vUp){
                     if(bo.board[x+i][y]!=null){
                         if(bo.board[x+i][y].team.equals(this.team)){
                             vUp = false;
-                            if(!cb.buttons[x+i][y].getBackground().equals(Color.cyan))
-                            cb.buttons[x+i][y].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x+i,y});
+                            moves.get("Defence").addAll(vU);
+                            vU.clear();
                         }
                         else{
-                            if(((x+i)==z[0] && (y)==z[1])){
-                                if(!isCheckvUp){
-                                    i = 0;
+                            if(bo.board[x+i][y].getClass().equals(King.class)){
+                                if(!CheckvUp){
+                                    moves.get("Check").add(new Integer[]{x+i,y});
+                                    moves.get("Check").addAll(vU);
+                                    vU.clear();
                                     isCheckvUp = true;
-                                    continue;
-                                }
-                                else if(isCheckvUp && CheckvUp){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckvUp = false;
-                                    vUp = false;
                                 }
                                 else{
-                                    cb.buttons[x+i][y].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    vUp = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x+i-j,y})) {
+                                                    moves.get("Restrict").add(new Integer[]{x+i-j,y});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckvUp && !CheckvUp){
+                                if(!CheckvUp){
+                                    CheckvUp = true;
+                                    moves.get("Attack").add(new Integer[]{x+i,y});
+                                    moves.get("Defence").addAll(vU);}
+                                else{
+                                    if(isCheckvUp){
+                                        moves.get("Restrict").addAll(vU);
+                                    }
                                     vUp = false;
                                 }
-                                else if(isCheckvUp){
-                                    cb.buttons[x+i][y].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed3)
-                                else if(CheckvUp)
-                                vUp = false;
-                                else{
-                                    CheckvUp = true;
-                                    if(!cb.buttons[x+i][y].getBackground().equals(Color.cyan) && !cb.buttons[x+i][y].getBackground().equals(Color.yellow))
-                                    cb.buttons[x+i][y].setBackground(Color.red);
-                                }
-                            }
+                                vU.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckvUp && !hasPassed)
-                        cb.buttons[x+i][y].setBackground(Color.cyan);
-                        else if(!cb.buttons[x+i][y].getBackground().equals(Color.cyan))
-                        cb.buttons[x+i][y].setBackground(Color.red);
+                        vU.add(new Integer[]{x+i,y});
                     }
-                }else{vUp=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckvUp){
+                    moves.get("Restrict").addAll(vU);
+                }
+                else if(!CheckvUp){
+                    moves.get("Defence").addAll(vU);
+                }
+                vU.clear();
+                vUp=false;
+            }
             try{
-                if((x - i >= 0)&&vDown){
+                if(vDown){
                     if(bo.board[x-i][y]!=null){
                         if(bo.board[x-i][y].team.equals(this.team)){
                             vDown = false;
-                            if(!cb.buttons[x-i][y].getBackground().equals(Color.cyan))
-                            cb.buttons[x-i][y].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x-i,y});
+                            moves.get("Defence").addAll(vD);
+                            vD.clear();
                         }
                         else{
-                            if(((x-i)==z[0] && (y)==z[1])){
-                                if(!isCheckvDown){
-                                    i = 0;
+                            if(bo.board[x-i][y].getClass().equals(King.class)){
+                                if(!CheckvDown){
+                                    moves.get("Check").add(new Integer[]{x-i,y});
+                                    moves.get("Check").addAll(vD);
+                                    vD.clear();
                                     isCheckvDown = true;
-                                    continue;
-                                }
-                                else if(isCheckvDown && CheckvDown){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckvDown = false;
-                                    CheckvDown = false;
                                 }
                                 else{
-                                    cb.buttons[x-i][y].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    vDown = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x-i+j,y})) {
+                                                    moves.get("Restrict").add(new Integer[]{x-i+j,y});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckvDown && !CheckvDown){
-                                    vDown = false;
-                                }
-                                else if(isCheckvDown){
-                                    cb.buttons[x-i][y].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed4)
-                                else if(CheckvDown)
-                                vDown = false;
-                                else{
+                                if(!CheckvDown){
                                     CheckvDown = true;
-                                    if(!cb.buttons[x-i][y].getBackground().equals(Color.cyan) && !cb.buttons[x-i][y].getBackground().equals(Color.yellow))
-                                    cb.buttons[x-i][y].setBackground(Color.red);
-                                }
-                            }
+                                    moves.get("Attack").add(new Integer[]{x-i,y});
+                                    moves.get("Defence").addAll(vD);}
+                                else{
+                                    if(isCheckvDown){
+                                        moves.get("Restrict").addAll(vD);}
+                                    vDown = false;
+                                    }
+                                    vD.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckvDown && !hasPassed)
-                        cb.buttons[x-i][y].setBackground(Color.cyan);
-                        else if(!cb.buttons[x-i][y].getBackground().equals(Color.cyan))
-                        cb.buttons[x-i][y].setBackground(Color.red);
+                        vD.add(new Integer[]{x-i,y});
                     }
-                }else{vDown=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckvDown){
+                    moves.get("Restrict").addAll(vD);
+                }
+                else if(!CheckvDown){
+                    moves.get("Defence").addAll(vD);
+                }
+                vD.clear();
+                vDown=false;
+            }
         }
-        return (isCheckhLeft || isCheckhRight || isCheckvDown || isCheckvUp);
+        return moves;
     }
 
     public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
@@ -1174,21 +1307,6 @@ class Rook extends Pawn{
         return saving;
     }
 
-    public int onlyMove(ChessBoard cb){
-        int canDo = 0;
-        for(int i =0;i<8;i++){
-            for(int j=0;j<8;j++){
-                if(cb.buttons[i][j].getBackground().equals(Color.red) || cb.buttons[i][j].getBackground().equals(Color.cyan)){
-                    canDo++;
-                    cb.buttons[i][j].setBackground(Color.CYAN);
-                }
-                else{
-                    cb.buttons[i][j].setState(i, j);
-                }
-            }
-        }
-        return canDo;
-    }
 }
 
 class Bishop extends Pawn{
@@ -1214,219 +1332,278 @@ class Bishop extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public boolean showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
-        boolean isCheckrightDown=false,isCheckrightUp=false,isCheckleftDown=false,isCheckleftUp=false;
-        boolean hasPassed5 = false,hasPassed6 = false, hasPassed7 = false,hasPassed8 = false;
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new ArrayList<>());
+        moves.put("Attack", new ArrayList<>());
+        moves.put("Neighbor", new ArrayList<>());
+        moves.put("Check", new ArrayList<>());
+        moves.put("Restrict", new ArrayList<>());
+        ArrayList<Integer[]> rU = new ArrayList<>(), rD = new ArrayList<>(), lU = new ArrayList<>(), lD = new ArrayList<>();
+        boolean isCheckrightUp=false,isCheckrightDown=false,isCheckleftUp=false,isCheckleftDown=false;
         boolean CheckleftUp=false,CheckleftDown=false,CheckrightUp=false,CheckrightDown = false;
         boolean leftUp=true,leftDown=true,rightUp=true,rightDown = true;
-        boolean hasPassed = false;
         for(int i = 1;i<8;i++){
             try{
-                if((x+i < 8&&y+i < 8)&&rightUp){
+                if(rightUp){
                     if(bo.board[x+i][y+i]!=null){
                         if(bo.board[x+i][y+i].team.equals(this.team)){
                             rightUp = false;
-                            if(!cb.buttons[x+i][y+i].getBackground().equals(Color.cyan))
-                            cb.buttons[x+i][y+i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x+i,y+i});
+                            moves.get("Defence").addAll(rU);
+                            rU.clear();
                         }
                         else{
-                            if(((x+i)==z[0] && (y+i)==z[1])){
-                                if(!isCheckrightUp){
-                                    i = 0;
+                            if(bo.board[x+i][y+i].getClass().equals(King.class)){
+                                if(!CheckrightUp){
+                                    moves.get("Check").add(new Integer[]{x+i,y+i});
+                                    moves.get("Check").addAll(rU);
+                                    rU.clear();
                                     isCheckrightUp = true;
-                                    continue;
-                                }
-                                else if(isCheckrightUp && CheckrightUp){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckrightUp = false;
-                                    rightUp = false;
                                 }
                                 else{
-                                    cb.buttons[x+i][y+i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    rightUp = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x+i-j,y+i-j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x+i-j,y+i-j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckrightUp && !CheckrightUp){
+                                if(!CheckrightUp){
+                                    CheckrightUp = true;
+                                    moves.get("Attack").add(new Integer[]{x+i,y+i});
+                                    moves.get("Defence").addAll(rU);}
+                                else{
+                                    if(isCheckrightUp){
+                                        moves.get("Restrict").addAll(rU);
+                                    }
                                     rightUp = false;
                                 }
-                                else if(isCheckrightUp){
-                                    cb.buttons[x+i][y+i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed5)
-                                else if(CheckrightUp)
-                                rightUp = false;
-                                else{
-                                    CheckrightUp = true;
-                                    if(!cb.buttons[x+i][y+i].getBackground().equals(Color.cyan) && !cb.buttons[x+i][y+i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x+i][y+i].setBackground(Color.red);
-                                }
-                            }
+                                rU.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckrightUp && !hasPassed)
-                        cb.buttons[x+i][y+i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x+i][y+i].getBackground().equals(Color.cyan))
-                        cb.buttons[x+i][y+i].setBackground(Color.red);
+                        rU.add(new Integer[]{x+i,y+i});
                     }
-                }else{rightUp=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckrightUp){
+                    moves.get("Restrict").addAll(rU);
+                }
+                else if(!CheckrightUp){
+                    moves.get("Defence").addAll(rU);
+                }
+                rU.clear();
+                rightUp=false;
+            }
             try{
-                if((y-i >= 0&&x+i<8)&&leftDown){
+                if(leftDown){
                     if(bo.board[x+i][y-i]!=null){
                         if(bo.board[x+i][y-i].team.equals(this.team)){
                             leftDown = false;
-                            if(!cb.buttons[x+i][y-i].getBackground().equals(Color.cyan))
-                            cb.buttons[x+i][y-i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x+i,y-i});
+                            moves.get("Defence").addAll(lD);
+                            lD.clear();
                         }
                         else{
-                            if(((x+i)==z[0] && (y-i)==z[1])){
-                                if(!isCheckleftDown){
-                                    i = 0;
+                            if(bo.board[x+i][y-i].getClass().equals(King.class)){
+                                if(!CheckleftDown){
+                                    moves.get("Check").add(new Integer[]{x+i,y-i});
+                                    moves.get("Check").addAll(lD);
+                                    lD.clear();
                                     isCheckleftDown = true;
-                                    continue;
-                                }
-                                else if(isCheckleftDown && CheckleftDown){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckleftDown = false;
-                                    leftDown = false;
                                 }
                                 else{
-                                    cb.buttons[x+i][y-i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    leftDown = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x+i-j,y-i+j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x+i-j,y-i+j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckleftDown && !CheckleftDown){
+                                if(!CheckleftDown){
+                                    CheckleftDown = true;
+                                    moves.get("Attack").add(new Integer[]{x+i,y-i});
+                                    moves.get("Defence").addAll(lD);
+                                }
+                                else{
+                                    if(isCheckleftDown){
+                                        moves.get("Restrict").addAll(lD);
+                                    }
                                     leftDown = false;
                                 }
-                                else if(isCheckleftDown){
-                                    cb.buttons[x+i][y-i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed6)
-                                else if(CheckleftDown)
-                                leftDown = false;
-                                else{
-                                    CheckleftDown = true;
-                                    if(!cb.buttons[x+i][y-i].getBackground().equals(Color.cyan) && !cb.buttons[x+i][y-i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x+i][y-i].setBackground(Color.red);
-                                }
-                            }
+                                lD.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckleftDown && !hasPassed)
-                        cb.buttons[x+i][y-i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x+i][y-i].getBackground().equals(Color.cyan))
-                        cb.buttons[x+i][y-i].setBackground(Color.red);
+                        lD.add(new Integer[]{x+i,y-i});
                     }
-                }else{leftDown=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckleftDown){
+                    moves.get("Restrict").addAll(lD);
+                }
+                else if(!CheckleftDown){
+                    moves.get("Defence").addAll(lD);
+                }
+                lD.clear();
+                leftDown=false;
+            }
             try{
-                if((y+i<8&&x-i>=0)&&leftUp){
+                if(leftUp){
                     if(bo.board[x-i][y+i]!=null){
                         if(bo.board[x-i][y+i].team.equals(this.team)){
                             leftUp = false;
-                            if(!cb.buttons[x-i][y+i].getBackground().equals(Color.cyan))
-                            cb.buttons[x-i][y+i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x-i,y+i});
+                            moves.get("Defence").addAll(lU);
+                            lU.clear();
                         }
                         else{
-                            if(((x-i)==z[0] && (y+i)==z[1])){
-                                if(!isCheckleftUp){
-                                    i = 0;
+                            if(bo.board[x-i][y+i].getClass().equals(King.class)){
+                                if(!CheckleftUp){
+                                    moves.get("Check").add(new Integer[]{x-i,y+i});
+                                    moves.get("Check").addAll(lU);
+                                    lU.clear();
                                     isCheckleftUp = true;
-                                    continue;
-                                }
-                                else if(isCheckleftUp && CheckleftUp){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckleftUp = false;
-                                    leftUp = false;
                                 }
                                 else{
-                                    cb.buttons[x-i][y+i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    leftUp = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x-i+j,y+i-j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x-i+j,y+i-j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckleftUp && !CheckleftUp){
+                                if(!CheckleftUp){
+                                    CheckleftUp = true;
+                                    moves.get("Attack").add(new Integer[]{x-i,y+i});
+                                    moves.get("Defence").addAll(lU);
+                                }
+                                else{
+                                    if(isCheckleftUp){
+                                        moves.get("Restrict").addAll(lU);
+                                    }
                                     leftUp = false;
                                 }
-                                else if(isCheckleftUp){
-                                    cb.buttons[x-i][y+i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed7)
-                                else if(CheckleftUp)
-                                leftUp = false;
-                                else{
-                                    CheckleftUp = true;
-                                    if(!cb.buttons[x-i][y+i].getBackground().equals(Color.cyan) && !cb.buttons[x-i][y+i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x-i][y+i].setBackground(Color.red);
-                                }
-                            }
+                                lU.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckleftUp && !hasPassed)
-                        cb.buttons[x-i][y+i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x-i][y+i].getBackground().equals(Color.cyan))
-                        cb.buttons[x-i][y+i].setBackground(Color.red);
+                        lU.add(new Integer[]{x-i,y+i});
                     }
-                }else{leftUp=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckleftUp){
+                    moves.get("Restrict").addAll(lU);
+                }
+                else if(!CheckleftUp){
+                    moves.get("Defence").addAll(lU);
+                }
+                lU.clear();
+                leftUp=false;
+            }
             try{
-                if((x - i >= 0&&y-i>=0)&&rightDown){
+                if(rightDown){
                     if(bo.board[x-i][y-i]!=null){
                         if(bo.board[x-i][y-i].team.equals(this.team)){
                             rightDown = false;
-                            if(!cb.buttons[x-i][y-i].getBackground().equals(Color.cyan))
-                            cb.buttons[x-i][y-i].setBackground(Color.orange);
+                            moves.get("Neighbor").add(new Integer[]{x-i,y-i});
+                            moves.get("Defence").addAll(rD);
+                            rD.clear();
                         }
                         else{
-                            if(((x-i)==z[0] && (y-i)==z[1])){
-                                if(!isCheckrightDown){
-                                    i = 0;
+                            if(bo.board[x-i][y-i].getClass().equals(King.class)){
+                                if(!CheckrightDown){
+                                    moves.get("Check").add(new Integer[]{x-i,y-i});
+                                    moves.get("Check").addAll(rD);
+                                    rD.clear();
                                     isCheckrightDown = true;
-                                    continue;
-                                }
-                                else if(isCheckrightDown && CheckrightDown){
-                                    cb.buttons[x][y].setBackground(Color.cyan);
-                                    isCheckrightDown = false;
-                                    rightDown = false;
                                 }
                                 else{
-                                    cb.buttons[x-i][y-i].setBackground(Color.cyan);
-                                    hasPassed = true;
+                                    rightDown = false;
+                                    for(int j = 1;j<8;j++){
+                                        String[] keys = new String[]{"Defence", "Attack"};
+                                        boolean found = false;
+                                        for (String key : keys) {
+                                            for (Integer[] arr : moves.get(key)) {
+                                                if(Arrays.equals(arr, new Integer[]{x-i+j,y-i+j})) {
+                                                    moves.get("Restrict").add(new Integer[]{x-i+j,y-i+j});
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(found) break;    
+                                        }        
+                                    }
                                 }
                             }
                             else{
-                                if(isCheckrightDown && !CheckrightDown){
+                                if(!CheckrightDown){
+                                    CheckrightDown = true;
+                                    moves.get("Attack").add(new Integer[]{x-i,y-i});
+                                    moves.get("Defence").addAll(rD);}
+                                else{
+                                    if(isCheckrightDown){
+                                        moves.get("Restrict").addAll(rD);
+                                    }
                                     rightDown = false;
                                 }
-                                else if(isCheckrightDown){
-                                    cb.buttons[x-i][y-i].setBackground(Color.yellow);
-                                }
-                                //else if(hasPassed8)
-                                else if(CheckrightDown)
-                                rightDown = false;
-                                else{
-                                    CheckrightDown = true;
-                                    if(!cb.buttons[x-i][y-i].getBackground().equals(Color.cyan) && !cb.buttons[x-i][y-i].getBackground().equals(Color.yellow))
-                                    cb.buttons[x-i][y-i].setBackground(Color.red);
-                                }
-                            }
+                                rD.clear();
+                            }      
                         }
                     }
                     else{
-                        if(isCheckrightDown && !hasPassed)
-                        cb.buttons[x-i][y-i].setBackground(Color.cyan);
-                        else if(!cb.buttons[x-i][y-i].getBackground().equals(Color.cyan))
-                        cb.buttons[x-i][y-i].setBackground(Color.red);
+                        rD.add(new Integer[]{x-i,y-i});
                     }
-                }else{rightDown=false;}
-            }catch(Exception e){}
+                }
+            }catch(Exception e){
+                if(isCheckrightDown){
+                    moves.get("Restrict").addAll(rD);
+                }
+                else if(!CheckrightDown){
+                    moves.get("Defence").addAll(rD);
+                }
+                rD.clear();
+                rightDown=false;
+            }
         }
-        return (isCheckleftDown || isCheckleftUp || isCheckrightDown || isCheckrightUp);
+        return moves;
     }
 
     public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
@@ -1477,19 +1654,4 @@ class Bishop extends Pawn{
         return saving;
     }
 
-    public int onlyMove(ChessBoard cb){
-        int canDo = 0;
-        for(int i =0;i<8;i++){
-            for(int j=0;j<8;j++){
-                if(cb.buttons[i][j].getBackground().equals(Color.red) || cb.buttons[i][j].getBackground().equals(Color.cyan) || cb.buttons[i][j].getBackground().equals(Color.yellow)){
-                    canDo++;
-                    cb.buttons[i][j].setBackground(Color.CYAN);
-                }
-                else{
-                    cb.buttons[i][j].setState(i, j);
-                }
-            }
-        }
-        return canDo;
-    }
 }

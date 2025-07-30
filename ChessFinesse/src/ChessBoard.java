@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.EmptyStackException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 
 import javax.swing.JButton;
@@ -71,23 +72,9 @@ public class ChessBoard extends JPanel {
 
 
     private void showPossibleMoves(int i,int j,boolean check){
-        for (Integer[] key : defence.keySet()) {
-            if (Arrays.equals(key, new Integer[]{i,j})) {
-                ArrayList<Integer[]> canMove=defence.get(key);
-                if(canMove!=null){
-                    for(Integer[] c:canMove){
-                        buttons[c[0]][c[1]].setBackground(Color.cyan);
-                    }
-                    return;
-                }
-                else{
-                    board.showValidMoves(i, j, this);
-                    return;
-                }
-            }
-        }
         board.showValidMoves(i, j, this);
     }
+
 
     private ButtonFunc[][] cloneButtons(){
         ButtonFunc [][] copy2 = new ButtonFunc[8][8];
@@ -183,11 +170,9 @@ public class ChessBoard extends JPanel {
     }
 
     boolean isCheck(){
-        if(!board.searchForChecks(this, board.findKing(match.turn)).isEmpty()){
+        if(!board.searchForChecks(this).isEmpty()){
             board.shiftBoard();
             updateButtons();
-            int[] save = board.findKing(match.turn);
-            buttons[save[0]][save[1]].setBackground(Color.red);
             return true;
         }
         board.shiftBoard();
@@ -195,9 +180,9 @@ public class ChessBoard extends JPanel {
     }
 
     boolean canCheck(){
-        ArrayList<int[]> attack = board.searchForChecks(this, board.findKing(match.turn));
+        Set<Integer[]> attack = board.searchForChecks(this);
         if(!attack.isEmpty()){
-            for(int[]d:attack){
+            for(Integer[]d:attack){
                 if(!buttons[d[0]][d[1]].getBackground().equals(Color.orange))
                 buttons[d[0]][d[1]].setBackground(Color.cyan);
             }
