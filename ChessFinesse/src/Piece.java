@@ -24,9 +24,9 @@ abstract class Piece {
 
     public abstract Piece copy();
 
-    public abstract Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y);
+    public abstract Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y);
 
-    public abstract ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z);
+    public abstract ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y);
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
@@ -59,28 +59,21 @@ class King extends Piece{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    private Set<List<Integer>> coordinateOfChecking(Set<Integer[]> a){
-        Set<List<Integer>> listSet = new HashSet<>();
-        for(Integer[] i:a){
-            i[0] = 7 - i[0];
-            i[1] = 7 - i[1];
-            listSet.add(Arrays.asList(i));
-        }
-        return listSet;
-    }
     
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+    
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
         Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new ArrayList<>());
         moves.put("Attack", new ArrayList<>());
         moves.put("Neighbor", new ArrayList<>());
-        if(team.equals(cb.match.turn)){
+        if(team.equals(turn)){
             bo.shiftBoard();
-            Set<Integer[]> save = bo.searchForChecks(cb);
+            Set<Integer[]> save = bo.searchForChecks();
             bo.shiftBoard();
-            Set<List<Integer>> a = coordinateOfChecking(save);
+            Set<List<Integer>> a = bo.coordinateOfChecking(save);
             for(int i = 1;Math.abs(i)<2;i--){
                 for(int j = 1;Math.abs(j)<2;j--){
+                    if(i == 0 && j == 0)continue;
                     try{
                         if(!a.contains(Arrays.asList(x+i, y+j))){
                             if((bo.board[x+i][y+j]==null)){
@@ -114,18 +107,12 @@ class King extends Piece{
         return moves; 
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
-        ArrayList<Integer[]> canSave = new ArrayList<>();
-        for(int i = 1;Math.abs(i)<2;i--){
-            for(int j = 1;Math.abs(j)<2;j--){
-                if(i == 0 && j == 0)continue;
-                try{
-                    if(!cb.buttons[x+i][y+j].getBackground().equals(Color.orange) && !cb.buttons[x+i][y+j].getBackground().equals(Color.red) && ((bo.getButton(x+i, y+j) == null && !cb.buttons[x+i][y+j].getBackground().equals(Color.cyan)) || (cb.buttons[x+i][y+j].getBackground().equals(Color.cyan) && !bo.getButton(x+i, y+j).team.equals(this.team))))
-                    canSave.add(new Integer[]{x+i,y+j});
-                }catch(Exception e){}      
-            }
-        }
-        return canSave;
+    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref , int x, int y){
+        Map<String,ArrayList<Integer[]>> moves = showPossibleMoves(bo, team, x, y);
+        ArrayList<Integer[]> saving = new ArrayList<>();
+        saving.addAll(moves.get("Defence"));
+        saving.addAll(moves.get("Attack"));
+        return saving;
     }
 
 
@@ -165,7 +152,7 @@ class Pawn extends Piece{
         return "ChessFinesse//Pics&Vids//Pics//b_pawn_1x.png";
     }
 
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
         Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new ArrayList<>());
         moves.put("Attack", new ArrayList<>());
@@ -214,13 +201,24 @@ class Pawn extends Piece{
         return moves;
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
+    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y){
         ArrayList<Integer[]> saving = new ArrayList<>();
         int i = 1;
         while((i<=1+(hasMoved?0:1))&&(x-i>=0)){
             if(bo.board[x-i][y]==null){
-                if((cb.buttons[x-i][y].getBackground().equals(Color.cyan))){
-                    saving.add(new Integer[]{x-i,y});
+                if(ref.get("Defence").contains(new Integer[]{x,y})){
+                    for (Integer[] arr : ref.get("Path")) {
+                        if(Arrays.equals(arr, new Integer[]{x-i,y})) {
+                            saving.add(new Integer[]{x-i,y});
+                        }
+                    }
+                }
+                else{
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x,y+i})) {
+                            saving.add(new Integer[]{x,y+i});
+                        }
+                    }
                 }
             }
             else{
@@ -229,13 +227,39 @@ class Pawn extends Piece{
             i++;
         }
         try{
-            if(x-1 >= 0 && y+1<8 && (cb.buttons[x-1][y+1].getBackground().equals(Color.cyan)) && !bo.board[x-1][y+1].team.equals(this.team)){
-                saving.add(new Integer[]{x-1,y+1});
+            if(bo.board[x-1][y+1]!=null && !bo.board[x-1][y+1].team.equals(this.team)){
+                if(ref.get("Defence").contains(new Integer[]{x,y})) {
+                    for (Integer[] arr : ref.get("Path")) {
+                        if(Arrays.equals(arr, new Integer[]{x-1,y+1})) {
+                            saving.add(new Integer[]{x-1,y+1});
+                        }
+                    }
+                }
+                else{
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x-1,y+1})) {
+                            saving.add(new Integer[]{x-1,y+1});
+                        }
+                    }
+                }
             }
         }catch(Exception e){}
         try{
-            if(x-1 >= 0 && y-1>=0 &&(cb.buttons[x-1][y-1].getBackground().equals(Color.cyan)) && !bo.board[x-1][y-1].team.equals(this.team)){
-                saving.add(new Integer[]{x-1,y-1});
+            if(bo.board[x-1][y-1]!=null && !bo.board[x-1][y-1].team.equals(this.team)){
+                if(ref.get("Defence").contains(new Integer[]{x,y})) {
+                    for (Integer[] arr : ref.get("Path")) {
+                        if(Arrays.equals(arr, new Integer[]{x-1,y-1})) {
+                            saving.add(new Integer[]{x-1,y-1});
+                        }
+                    }
+                }
+                else{
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x-1,y-1})) {
+                            saving.add(new Integer[]{x-1,y-1});
+                        }
+                    }
+                }
             }
         }catch(Exception e){}
         return saving;
@@ -272,7 +296,7 @@ class Knight extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
         Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new ArrayList<>());
         moves.put("Attack", new ArrayList<>());
@@ -302,14 +326,28 @@ class Knight extends Pawn{
         return moves;
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
+    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y){
         ArrayList<Integer[]> saving = new ArrayList<>();
         for(int i = 2;Math.abs(i)<=2;i--){
             for(int j = 2;Math.abs(j)<=2;j--){
                 if(Math.abs(i) == Math.abs(j) || i == 0 || j == 0)continue;
                 try{
-                    if((cb.buttons[x+i][y+j].getBackground().equals(Color.cyan)) && ((bo.getButton(x+i, y+j) == null) || !bo.getButton(x+i, y+j).team.equals(this.team)))
-                    saving.add(new Integer[]{x+i,y+j});
+                    if(bo.board[x+i][y+j]==null || !bo.board[x+i][y+j].team.equals(this.team)){
+                        if(ref.get("Defence").contains(new Integer[]{x,y})){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x+i,y+j})) {
+                                    saving.add(new Integer[]{x+i,y+j});
+                                }
+                            }
+                        }
+                        else{
+                            for (Integer[] arr : ref.get("Attack")) {
+                                if(Arrays.equals(arr, new Integer[]{x+i,y+j})) {
+                                    saving.add(new Integer[]{x+i,y+j});
+                                }
+                            }
+                        }
+                    }
                 }catch(Exception e){}
             }
         }
@@ -342,7 +380,7 @@ class Queen extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
         Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new ArrayList<>());
         moves.put("Attack", new ArrayList<>());
@@ -369,7 +407,6 @@ class Queen extends Pawn{
                         else{
                             if(bo.board[x][y+i].getClass().equals(King.class)){
                                 if(!CheckhRight){
-                                    moves.get("Check").add(new Integer[]{x,y+i});
                                     moves.get("Check").addAll(hR);
                                     hR.clear();
                                     isCheckhRight = true;
@@ -393,7 +430,7 @@ class Queen extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckhRight){
+                                if(!CheckhRight && !isCheckhRight){
                                     CheckhRight = true;
                                     moves.get("Attack").add(new Integer[]{x,y+i});
                                     moves.get("Defence").addAll(hR);
@@ -434,7 +471,6 @@ class Queen extends Pawn{
                         else{
                             if(bo.board[x][y-i].getClass().equals(King.class)){
                                 if(!CheckhLeft){
-                                    moves.get("Check").add(new Integer[]{x,y-i});
                                     moves.get("Check").addAll(hL);
                                     hL.clear();
                                     isCheckhLeft = true;
@@ -458,7 +494,7 @@ class Queen extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckhLeft){
+                                if(!CheckhLeft && !isCheckhLeft){
                                     CheckhLeft = true;
                                     moves.get("Attack").add(new Integer[]{x,y-i});
                                     moves.get("Defence").addAll(hL);}
@@ -497,7 +533,6 @@ class Queen extends Pawn{
                         else{
                             if(bo.board[x+i][y].getClass().equals(King.class)){
                                 if(!CheckvUp){
-                                    moves.get("Check").add(new Integer[]{x+i,y});
                                     moves.get("Check").addAll(vU);
                                     vU.clear();
                                     isCheckvUp = true;
@@ -521,7 +556,7 @@ class Queen extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckvUp){
+                                if(!CheckvUp && !isCheckvUp){
                                     CheckvUp = true;
                                     moves.get("Attack").add(new Integer[]{x+i,y});
                                     moves.get("Defence").addAll(vU);}
@@ -561,7 +596,6 @@ class Queen extends Pawn{
                         else{
                             if(bo.board[x-i][y].getClass().equals(King.class)){
                                 if(!CheckvDown){
-                                    moves.get("Check").add(new Integer[]{x-i,y});
                                     moves.get("Check").addAll(vD);
                                     vD.clear();
                                     isCheckvDown = true;
@@ -585,7 +619,7 @@ class Queen extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckvDown){
+                                if(!CheckvDown && !isCheckvDown){
                                     CheckvDown = true;
                                     moves.get("Attack").add(new Integer[]{x-i,y});
                                     moves.get("Defence").addAll(vD);}
@@ -624,7 +658,6 @@ class Queen extends Pawn{
                         else{
                             if(bo.board[x+i][y+i].getClass().equals(King.class)){
                                 if(!CheckrightUp){
-                                    moves.get("Check").add(new Integer[]{x+i,y+i});
                                     moves.get("Check").addAll(rU);
                                     rU.clear();
                                     isCheckrightUp = true;
@@ -648,7 +681,7 @@ class Queen extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckrightUp){
+                                if(!CheckrightUp && !isCheckrightUp){
                                     CheckrightUp = true;
                                     moves.get("Attack").add(new Integer[]{x+i,y+i});
                                     moves.get("Defence").addAll(rU);}
@@ -688,7 +721,6 @@ class Queen extends Pawn{
                         else{
                             if(bo.board[x+i][y-i].getClass().equals(King.class)){
                                 if(!CheckleftDown){
-                                    moves.get("Check").add(new Integer[]{x+i,y-i});
                                     moves.get("Check").addAll(lD);
                                     lD.clear();
                                     isCheckleftDown = true;
@@ -712,7 +744,7 @@ class Queen extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckleftDown){
+                                if(!CheckleftDown && !isCheckleftDown){
                                     CheckleftDown = true;
                                     moves.get("Attack").add(new Integer[]{x+i,y-i});
                                     moves.get("Defence").addAll(lD);
@@ -753,7 +785,6 @@ class Queen extends Pawn{
                         else{
                             if(bo.board[x-i][y+i].getClass().equals(King.class)){
                                 if(!CheckleftUp){
-                                    moves.get("Check").add(new Integer[]{x-i,y+i});
                                     moves.get("Check").addAll(lU);
                                     lU.clear();
                                     isCheckleftUp = true;
@@ -777,7 +808,7 @@ class Queen extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckleftUp){
+                                if(!CheckleftUp && !isCheckleftUp){
                                     CheckleftUp = true;
                                     moves.get("Attack").add(new Integer[]{x-i,y+i});
                                     moves.get("Defence").addAll(lU);
@@ -818,7 +849,6 @@ class Queen extends Pawn{
                         else{
                             if(bo.board[x-i][y-i].getClass().equals(King.class)){
                                 if(!CheckrightDown){
-                                    moves.get("Check").add(new Integer[]{x-i,y-i});
                                     moves.get("Check").addAll(rD);
                                     rD.clear();
                                     isCheckrightDown = true;
@@ -842,7 +872,7 @@ class Queen extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckrightDown){
+                                if(!CheckrightDown && !isCheckrightDown){
                                     CheckrightDown = true;
                                     moves.get("Attack").add(new Integer[]{x-i,y-i});
                                     moves.get("Defence").addAll(rD);}
@@ -874,91 +904,209 @@ class Queen extends Pawn{
         return moves;
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
+    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y){
         ArrayList<Integer[]> saving = new ArrayList<>();
         boolean vUp=true,vDown=true,hLeft=true,hRight = true;
         boolean leftUp=true,leftDown=true,rightUp=true,rightDown = true;
         for(int i = 1;i<8;i++){
-            try{
-                if(hRight && (bo.board[x][y+i]==null || !bo.board[x][y+i].team.equals(this.team))){
-                    if(cb.buttons[x][y+i].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x,y+i});
-                    if(bo.board[x][y+i]!=null)
+            if(ref.get("Defence") != null && ref.get("Defence").contains(new Integer[]{x,y})){
+                if(hRight){
+                    try{
+                        if(bo.board[x][y+i]!=null && !bo.board[x][y+i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x,y+i})) {
+                                    saving.add(new Integer[]{x,y+i});
+                                }
+                            }
+                        }
+                    }catch(Exception e){}
+                }
+                else{
                     hRight = false;
+                }
+                if(hLeft){
+                    try{
+                        if(bo.board[x][y-i]!=null && !bo.board[x][y-i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x,y-i})) {
+                                    saving.add(new Integer[]{x,y-i});
+                                }
+                            }
+                        }
+                    }catch(Exception e){}
+                    }
+                    else{
+                        hLeft = false;
+                }
+                try{
+                    if(vDown){
+                        if(bo.board[x+i][y]!=null && !bo.board[x+i][y].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x+i,y})) {
+                                    saving.add(new Integer[]{x+i,y});
+                                }
+                            }
+                        }
+                    }else{
+                        vDown = false;
+                    }
+                }catch(Exception e){}
+                try{
+                    if(vUp){
+                        if(bo.board[x-i][y]!=null && !bo.board[x-i][y].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x-i,y})) {
+                                    saving.add(new Integer[]{x-i,y});
+                                }
+                            }
+                        }
+                    }else{
+                        vUp = false;
+                    }
+                }catch(Exception e){}
+                try{
+                    if(rightDown){
+                        if(bo.board[x+i][y+i]!=null && !bo.board[x+i][y+i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x+i,y+i})) {
+                                    saving.add(new Integer[]{x+i,y+i});
+                                }
+                            }
+                        }
+                    }else{
+                        rightDown = false;
+                    }
+                }catch(Exception e){}
+                try{
+                    if(leftUp){
+                        if(bo.board[x+i][y-i]!=null && !bo.board[x+i][y-i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x+i,y-i})) {
+                                    saving.add(new Integer[]{x+i,y-i});
+                                }
+                            }
+                        }
+                    }else{
+                        leftUp = false;
+                    }
+                }catch(Exception e){}
+                try{
+                    if(rightUp){
+                        if(bo.board[x-i][y+i]!=null && !bo.board[x-i][y+i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x-i,y+i})) {
+                                    saving.add(new Integer[]{x-i,y+i});
+                                }
+                            }
+                        }
+                    }else{
+                        rightUp = false;
+                    }
+                }catch(Exception e){}
+                try{
+                    if(leftDown){
+                        if(bo.board[x-i][y-i]!=null && !bo.board[x-i][y-i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x-i,y-i})) {
+                                    saving.add(new Integer[]{x-i,y-i});
+                                }
+                            }
+                        }
+                    }else{
+                        leftDown = false;
+                    }
+                }catch(Exception e){}
+            }
+            else{
+                try{
+                if(hRight && (bo.board[x][y+i]==null || !bo.board[x][y+i].team.equals(this.team))){
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x,y+i})) {
+                            saving.add(new Integer[]{x,y+i});
+                        }
+                    }
                 }
                 else
                 hRight = false;
             }catch(Exception e){}
             try{
                 if(hLeft && (bo.board[x][y-i]==null || !bo.board[x][y-i].team.equals(this.team))){
-                    if(cb.buttons[x][y-i].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x,y-i});
-                    if(bo.board[x][y-i]!=null)
-                    hLeft = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x,y-i})) {
+                            saving.add(new Integer[]{x,y-i});
+                        }
+                    }
                 }
                 else
                 hLeft = false;
             }catch(Exception e){}
             try{
                 if(vDown && (bo.board[x+i][y]==null || !bo.board[x+i][y].team.equals(this.team))){
-                    if(cb.buttons[x+i][y].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x+i,y});
-                    if(bo.board[x+i][y]!=null)
-                    vDown = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x+i,y})) {
+                            saving.add(new Integer[]{x+i,y});
+                        }
+                    }
                 }
                 else
                 vDown = false;
             }catch(Exception e){}
             try{
                 if(vUp && (bo.board[x-i][y]==null || !bo.board[x-i][y].team.equals(this.team))){
-                    if(cb.buttons[x-i][y].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x-i,y});
-                    if(bo.board[x-i][y]!=null)
-                    vUp = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x-i,y})) {
+                            saving.add(new Integer[]{x-i,y});
+                        }
+                    }
                 }
                 else
                 vUp = false;
             }catch(Exception e){}
             try{
                 if(rightDown && (bo.board[x+i][y+i]==null || !bo.board[x+i][y+i].team.equals(this.team))){
-                    if(cb.buttons[x+i][y+i].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x+i,y+i});
-                    if(bo.board[x+i][y+i]!=null)
-                    rightDown = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x+i,y+i})) {
+                            saving.add(new Integer[]{x+i,y+i});
+                        }
+                    }
                 }
                 else
                 rightDown = false;
             }catch(Exception e){}
             try{
                 if(leftUp && (bo.board[x+i][y-i]==null || !bo.board[x+i][y-i].team.equals(this.team))){
-                    if(cb.buttons[x+i][y-i].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x+i,y-i});
-                    if(bo.board[x+i][y-i]!=null)
-                    leftUp = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x+i,y-i})) {
+                            saving.add(new Integer[]{x+i,y-i});
+                        }
+                    }
                 }
                 else
                 leftUp = false;
             }catch(Exception e){}
             try{
                 if(rightUp && (bo.board[x-i][y+i]==null || !bo.board[x-i][y+i].team.equals(this.team))){
-                    if(cb.buttons[x-i][y+i].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x-i,y+i});
-                    if(bo.board[x-i][y+i]!=null)
-                    rightUp = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x-i,y+i})) {
+                            saving.add(new Integer[]{x-i,y+i});
+                        }
+                    }
                 }
                 else
                 rightUp = false;
             }catch(Exception e){}
             try{
                 if(leftDown && (bo.board[x-i][y-i]==null || !bo.board[x-i][y-i].team.equals(this.team))){
-                    if(cb.buttons[x-i][y-i].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x-i,y-i});
-                    if(bo.board[x-i][y-i]!=null)
-                    leftDown = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x-i,y-i})) {
+                            saving.add(new Integer[]{x-i,y-i});
+                        }
+                    }
                 }
                 else
                 leftDown = false;
             }catch(Exception e){}
+            }
         } 
         return saving;
     }
@@ -988,7 +1136,7 @@ class Rook extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
         Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new ArrayList<>());
         moves.put("Attack", new ArrayList<>());
@@ -1012,7 +1160,6 @@ class Rook extends Pawn{
                         else{
                             if(bo.board[x][y+i].getClass().equals(King.class)){
                                 if(!CheckhRight){
-                                    moves.get("Check").add(new Integer[]{x,y+i});
                                     moves.get("Check").addAll(hR);
                                     hR.clear();
                                     isCheckhRight = true;
@@ -1036,7 +1183,7 @@ class Rook extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckhRight){
+                                if(!CheckhRight && !isCheckhRight){
                                     CheckhRight = true;
                                     moves.get("Attack").add(new Integer[]{x,y+i});
                                     moves.get("Defence").addAll(hR);
@@ -1077,7 +1224,6 @@ class Rook extends Pawn{
                         else{
                             if(bo.board[x][y-i].getClass().equals(King.class)){
                                 if(!CheckhLeft){
-                                    moves.get("Check").add(new Integer[]{x,y-i});
                                     moves.get("Check").addAll(hL);
                                     hL.clear();
                                     isCheckhLeft = true;
@@ -1101,7 +1247,7 @@ class Rook extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckhLeft){
+                                if(!CheckhLeft && !isCheckhLeft){
                                     CheckhLeft = true;
                                     moves.get("Attack").add(new Integer[]{x,y-i});
                                     moves.get("Defence").addAll(hL);}
@@ -1140,7 +1286,6 @@ class Rook extends Pawn{
                         else{
                             if(bo.board[x+i][y].getClass().equals(King.class)){
                                 if(!CheckvUp){
-                                    moves.get("Check").add(new Integer[]{x+i,y});
                                     moves.get("Check").addAll(vU);
                                     vU.clear();
                                     isCheckvUp = true;
@@ -1164,7 +1309,7 @@ class Rook extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckvUp){
+                                if(!CheckvUp && !isCheckvUp){
                                     CheckvUp = true;
                                     moves.get("Attack").add(new Integer[]{x+i,y});
                                     moves.get("Defence").addAll(vU);}
@@ -1204,7 +1349,6 @@ class Rook extends Pawn{
                         else{
                             if(bo.board[x-i][y].getClass().equals(King.class)){
                                 if(!CheckvDown){
-                                    moves.get("Check").add(new Integer[]{x-i,y});
                                     moves.get("Check").addAll(vD);
                                     vD.clear();
                                     isCheckvDown = true;
@@ -1228,7 +1372,7 @@ class Rook extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckvDown){
+                                if(!CheckvDown && !isCheckvDown){
                                     CheckvDown = true;
                                     moves.get("Attack").add(new Integer[]{x-i,y});
                                     moves.get("Defence").addAll(vD);}
@@ -1259,51 +1403,113 @@ class Rook extends Pawn{
         return moves;
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
+    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y){
         ArrayList<Integer[]> saving = new ArrayList<>();
         boolean vUp=true,vDown=true,hLeft=true,hRight = true;
         for(int i = 1;i<8;i++){
+            if(ref.get("Defence") != null && ref.get("Defence").contains(new Integer[]{x,y})){
+                if(hRight){
+                    try{
+                        if(bo.board[x][y+i]!=null && !bo.board[x][y+i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x,y+i})) {
+                                    saving.add(new Integer[]{x,y+i});
+                                }
+                            }
+                        }
+                    }catch(Exception e){}
+                }
+                else{
+                    hRight = false;
+                }
+                if(hLeft){
+                    try{
+                        if(bo.board[x][y-i]!=null && !bo.board[x][y-i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x,y-i})) {
+                                    saving.add(new Integer[]{x,y-i});
+                                }
+                            }
+                        }
+                    }catch(Exception e){}
+                }
+                else{
+                    hLeft = false;
+                }
+                try{
+                    if(vDown){
+                        if(bo.board[x+i][y]!=null && !bo.board[x+i][y].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x+i,y})) {
+                                    saving.add(new Integer[]{x+i,y});
+                                }
+                            }
+                        }
+                    }else{
+                        vDown = false;
+                    }
+                }catch(Exception e){}
+                try{
+                    if(vUp){
+                        if(bo.board[x-i][y]!=null && !bo.board[x-i][y].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x-i,y})) {
+                                    saving.add(new Integer[]{x-i,y});
+                                }
+                            }
+                        }
+                    }else{
+                        vUp = false;
+                    }
+                }catch(Exception e){}
+            }
+            else{
             try{
                 if(hRight && (bo.board[x][y+i]==null || !bo.board[x][y+i].team.equals(this.team))){
-                    if(cb.buttons[x][y+i].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x,y+i});
-                    if(bo.board[x][y+i]!=null)
-                    hRight = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x,y+i})) {
+                            saving.add(new Integer[]{x,y+i});
+                        }
+                    }
                 }
                 else
                 hRight = false;
             }catch(Exception e){}
             try{
                 if(hLeft && (bo.board[x][y-i]==null || !bo.board[x][y-i].team.equals(this.team))){
-                    if(cb.buttons[x][y-i].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x,y-i});
-                    if(bo.board[x][y-i]!=null)
-                    hLeft = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x,y-i})) {
+                            saving.add(new Integer[]{x,y-i});
+                        }
+                    }
                 }
                 else
                 hLeft = false;
             }catch(Exception e){}
             try{
                 if(vDown && (bo.board[x+i][y]==null || !bo.board[x+i][y].team.equals(this.team))){
-                    if(cb.buttons[x+i][y].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x+i,y});
-                    if(bo.board[x+i][y]!=null)
-                    vDown = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x+i,y})) {
+                            saving.add(new Integer[]{x+i,y});
+                        }
+                    }
                 }
                 else
                 vDown = false;
             }catch(Exception e){}
             try{
                 if(vUp && (bo.board[x-i][y]==null || !bo.board[x-i][y].team.equals(this.team))){
-                    if(cb.buttons[x-i][y].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x-i,y});
-                    if(bo.board[x-i][y]!=null)
-                    vUp = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x-i,y})) {
+                            saving.add(new Integer[]{x-i,y});
+                        }
+                    }
                 }
                 else
                 vUp = false;
             }catch(Exception e){}
-        } 
+        }
+    }
         return saving;
     }
 
@@ -1332,7 +1538,7 @@ class Bishop extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo,ChessBoard cb, int x, int y){
+    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
         Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new ArrayList<>());
         moves.put("Attack", new ArrayList<>());
@@ -1356,7 +1562,6 @@ class Bishop extends Pawn{
                         else{
                             if(bo.board[x+i][y+i].getClass().equals(King.class)){
                                 if(!CheckrightUp){
-                                    moves.get("Check").add(new Integer[]{x+i,y+i});
                                     moves.get("Check").addAll(rU);
                                     rU.clear();
                                     isCheckrightUp = true;
@@ -1380,7 +1585,7 @@ class Bishop extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckrightUp){
+                                if(!CheckrightUp && !isCheckrightUp){
                                     CheckrightUp = true;
                                     moves.get("Attack").add(new Integer[]{x+i,y+i});
                                     moves.get("Defence").addAll(rU);}
@@ -1420,7 +1625,6 @@ class Bishop extends Pawn{
                         else{
                             if(bo.board[x+i][y-i].getClass().equals(King.class)){
                                 if(!CheckleftDown){
-                                    moves.get("Check").add(new Integer[]{x+i,y-i});
                                     moves.get("Check").addAll(lD);
                                     lD.clear();
                                     isCheckleftDown = true;
@@ -1444,7 +1648,7 @@ class Bishop extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckleftDown){
+                                if(!CheckleftDown && !isCheckleftDown){
                                     CheckleftDown = true;
                                     moves.get("Attack").add(new Integer[]{x+i,y-i});
                                     moves.get("Defence").addAll(lD);
@@ -1485,7 +1689,6 @@ class Bishop extends Pawn{
                         else{
                             if(bo.board[x-i][y+i].getClass().equals(King.class)){
                                 if(!CheckleftUp){
-                                    moves.get("Check").add(new Integer[]{x-i,y+i});
                                     moves.get("Check").addAll(lU);
                                     lU.clear();
                                     isCheckleftUp = true;
@@ -1509,7 +1712,7 @@ class Bishop extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckleftUp){
+                                if(!CheckleftUp && !isCheckleftUp){
                                     CheckleftUp = true;
                                     moves.get("Attack").add(new Integer[]{x-i,y+i});
                                     moves.get("Defence").addAll(lU);
@@ -1550,7 +1753,6 @@ class Bishop extends Pawn{
                         else{
                             if(bo.board[x-i][y-i].getClass().equals(King.class)){
                                 if(!CheckrightDown){
-                                    moves.get("Check").add(new Integer[]{x-i,y-i});
                                     moves.get("Check").addAll(rD);
                                     rD.clear();
                                     isCheckrightDown = true;
@@ -1574,7 +1776,7 @@ class Bishop extends Pawn{
                                 }
                             }
                             else{
-                                if(!CheckrightDown){
+                                if(!CheckrightDown && !isCheckrightDown){
                                     CheckrightDown = true;
                                     moves.get("Attack").add(new Integer[]{x-i,y-i});
                                     moves.get("Defence").addAll(rD);}
@@ -1606,51 +1808,112 @@ class Bishop extends Pawn{
         return moves;
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo,ChessBoard cb, int x, int y,int[] z){
+    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y){
         ArrayList<Integer[]> saving = new ArrayList<>();
         boolean leftUp=true,leftDown=true,rightUp=true,rightDown = true;
         for(int i = 1;i<8;i++){
+            if(ref.get("Defence") != null && ref.get("Defence").contains(new Integer[]{x,y})){
+                if(rightUp){
+                    try{
+                        if(bo.board[x+i][y+i]!=null && !bo.board[x+i][y+i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x+i,y+i})) {
+                                    saving.add(new Integer[]{x+i,y+i});
+                                }
+                            }
+                        }
+                    }catch(Exception e){}
+                }
+                else{
+                    rightUp = false;
+                }
+                if(leftDown){
+                    try{
+                        if(bo.board[x+i][y-i]!=null && !bo.board[x+i][y-i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x+i,y-i})) {
+                                    saving.add(new Integer[]{x+i,y-i});
+                                }
+                            }
+                        }
+                    }catch(Exception e){}
+                }
+                else{
+                    leftDown = false;
+                }
+                try{
+                    if(leftUp){
+                        if(bo.board[x-i][y+i]!=null && !bo.board[x-i][y+i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x-i,y+i})) {
+                                    saving.add(new Integer[]{x-i,y+i});
+                                }
+                            }
+                        }
+                    }else{
+                        leftUp = false;
+                    }
+                }catch(Exception e){}
+                try{
+                    if(rightDown){
+                        if(bo.board[x-i][y-i]!=null && !bo.board[x-i][y-i].team.equals(this.team)){
+                            for (Integer[] arr : ref.get("Path")) {
+                                if(Arrays.equals(arr, new Integer[]{x-i,y-i})) {
+                                    saving.add(new Integer[]{x-i,y-i});
+                                }
+                            }
+                        }
+                    }else{
+                        rightDown = false;
+                    }
+                }catch(Exception e){}
+            }
+            else{
             try{
                 if(rightDown && (bo.board[x+i][y+i]==null || !bo.board[x+i][y+i].team.equals(this.team))){
-                    if(cb.buttons[x+i][y+i].getBackground().equals(Color.cyan) || cb.buttons[x+i][y+i].getBackground().equals(Color.orange))
-                    saving.add(new Integer[]{x+i,y+i});
-                    if(bo.board[x+i][y+i]!=null)
-                    rightDown = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x+i,y+i})) {
+                            saving.add(new Integer[]{x+i,y+i});
+                        }
+                    }
                 }
                 else
                 rightDown = false;
             }catch(Exception e){}
             try{
                 if(leftUp && (bo.board[x+i][y-i]==null || !bo.board[x+i][y-i].team.equals(this.team))){
-                    if(cb.buttons[x+i][y-i].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x+i,y-i});
-                    if(bo.board[x+i][y-i]!=null)
-                    leftUp = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x+i,y-i})) {
+                            saving.add(new Integer[]{x+i,y-i});
+                        }
+                    }
                 }
                 else
                 leftUp = false;
             }catch(Exception e){}
             try{
                 if(rightUp && (bo.board[x-i][y+i]==null || !bo.board[x-i][y+i].team.equals(this.team))){
-                    if(cb.buttons[x-i][y+i].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x-i,y+i});
-                    if(bo.board[x-i][y+i]!=null)
-                    rightUp = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x-i,y+i})) {
+                            saving.add(new Integer[]{x-i,y+i});
+                        }
+                    }
                 }
                 else
                 rightUp = false;
             }catch(Exception e){}
             try{
                 if(leftDown && (bo.board[x-i][y-i]==null || !bo.board[x-i][y-i].team.equals(this.team))){
-                    if(cb.buttons[x-i][y-i].getBackground().equals(Color.cyan))
-                    saving.add(new Integer[]{x-i,y-i});
-                    if(bo.board[x-i][y-i]!=null)
-                    leftDown = false;
+                    for (Integer[] arr : ref.get("Attack")) {
+                        if(Arrays.equals(arr, new Integer[]{x-i,y-i})) {
+                            saving.add(new Integer[]{x-i,y-i});
+                        }
+                    }
                 }
                 else
                 leftDown = false;
             }catch(Exception e){}
-        } 
+        } }
         return saving;
     }
 

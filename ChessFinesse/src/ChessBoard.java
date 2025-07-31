@@ -25,21 +25,16 @@ public class ChessBoard extends JPanel {
     private static final int BOARD_SIZE = 8;
     ButtonFunc[][] buttons;
     Pieces board;
-    Match match;
-    HashMap<Integer[],ArrayList<Integer[]>> defence = new HashMap<>(); 
     ArrayList<int[]> attack;
-    boolean check = false;
 
     public ChessBoard(GameView s){
         safe = s;
         buttons = new ButtonFunc[BOARD_SIZE][BOARD_SIZE];
         board = new Pieces();
-        match = new Match();
         this.setLayout(new GridLayout(BOARD_SIZE,BOARD_SIZE));
         this.setPreferredSize(new Dimension(700, 700));
         setMaximumSize(new Dimension(700,700));
         setMinimumSize(new Dimension(700,700));
-        board.initialize();
         initializeButtons();
     }
 
@@ -71,86 +66,37 @@ public class ChessBoard extends JPanel {
 
 
 
-    private void showPossibleMoves(int i,int j,boolean check){
-        board.showValidMoves(i, j, this);
+    private void showPossibleMoves(int i,int j){
+        onlyMove(board.movemap, i, j);
+        buttons[i][j].setBackground(Color.lightGray);
     }
 
 
-    private ButtonFunc[][] cloneButtons(){
-        ButtonFunc [][] copy2 = new ButtonFunc[8][8];
-        for (int i = 0; i < buttons.length; i++) {
-            for (int j = 0; j < buttons[i].length; j++) {
-                if (buttons[i][j] != null) {
-                    copy2[i][j] = buttons[i][j].clone(); 
-                    int row = i, col = j;
-                    copy2[i][j].addActionListener(customAction(row, col));
-                    add(copy2[i][j]);
+    public  void onlyMove(HashMap<Integer[],ArrayList<Integer[]>> moves, int row, int col){
+        for (Integer[] key : moves.keySet()) {
+            if (key[0] == row && key[1] == col) {
+                for(Integer[] move : moves.get(key)) {
+                        buttons[move[0]][move[1]].setBackground(Color.cyan);
                 }
             }
         }
-        return copy2;
     }
 
-    void shiftButtons(){
-        ButtonFunc [][] copy2 = cloneButtons();
-        for(int i = 0;i < buttons.length;i++){
-            for(int j = 0;j < buttons.length;j++){
-                if (board.getButton(i, j) != null) {
-                    copy2[i][j].setIcon(board.getButton(i,j).pic);
-                } else {
-                    copy2[i][j].setIcon(null);
-                }
-                copy2[i][j].setBackground(buttons[8-i-1][8-j-1].getBackground());
-                
-            }
-        }
-        buttons = copy2;
-        updateButtonLayout();
-    }
 
-    private boolean isValidMove(int i,int j){
-        return buttons[i][j].isValidMove(this, i, j);
-    }
 
-    void changeButtons(){
-        board.shiftBoard();
-        ButtonFunc [][] copy2 = buttons.clone();
-        for(int i = 0;i < buttons.length;i++){
-            for(int j = 0;j < buttons.length;j++){
-                copy2[i][j] = buttons[BOARD_SIZE-i-1][BOARD_SIZE-j-1];
-            }
-        }
-        buttons = copy2;
-        //updateButtonLayout();
-    }
-
-    private boolean correctMove(HashMap<Integer[],ArrayList<Integer[]>>map,Integer[]searchKey){
-        boolean found = false;
-        for (Integer[] key : map.keySet()) {
-            if (Arrays.equals(key, searchKey)) {
-                found = true;
-                break;
-            }
-        }
-        return found;
-    }
 
     private ActionListener customAction(int row,int col){
         return e -> {
-            if(board.getButton(row, col) != null && board.getButton(row,col).team.equals(match.turn)){
+            if(board.valid(row, col)){
                 updateButtons();
-                showPossibleMoves(row, col, check);
-                match.lastMoves = new int[]{row,col};
+                showPossibleMoves(row, col);
                 return;
             }
-            else if((board.getButton(row, col) == null || !board.getButton(row, col).team.equals(match.turn)) && (board.board[match.lastMoves[0]][match.lastMoves[1]].team.equals(match.turn)) && match.lastMoves!=null && isValidMove(row,col)){
-                    check = false;
-                    defence = null;
-                    int[]save = match.lastMoves;
+            else if(board.validChoice(row, col)){
+                    int[]save = board.match.lastMoves;
                     move(save, row, col);
-                    match.nextTurn();
-                    match.lastMoves = null;
-                    isCheckMate();
+                    if(!board.isCheckMate())
+                    board.match.lastMoves = null;
                     updateButtons();
                     return;
             }
@@ -160,72 +106,9 @@ public class ChessBoard extends JPanel {
         };
     }
 
-    void isCheckMate() {
-        updateButtons();
-        if(canCheck()){
-            check = true;
-        }
-        System.out.println(check);
-        defence = board.defendCheck(this);
-    }
-
-    boolean isCheck(){
-        if(!board.searchForChecks(this).isEmpty()){
-            board.shiftBoard();
-            updateButtons();
-            return true;
-        }
-        board.shiftBoard();
-        return false;
-    }
-
-    boolean canCheck(){
-        Set<Integer[]> attack = board.searchForChecks(this);
-        if(!attack.isEmpty()){
-            for(Integer[]d:attack){
-                if(!buttons[d[0]][d[1]].getBackground().equals(Color.orange))
-                buttons[d[0]][d[1]].setBackground(Color.cyan);
-            }
-            return true;
-        }
-        return false;
-    }
-
-    boolean canBeValid(int row,int col){
-        Piece copy = board.getButton(row, col).copy();
-        board.board[row][col] = null;
-        if(canCheck()){
-            board.board[row][col] = copy;
-            return false;
-        }
-        board.board[row][col] = copy;
-        return true;
-    }
     
 
-    public void updateButtonLayout() {
-        // Assuming you're using a JPanel to hold buttons
-        removeAll(); // Remove existing buttons from the panel
-        for (int i = 0; i < buttons.length; i++) {
-            for (int j = 0; j < buttons[i].length; j++) {
-                add(buttons[i][j]); // Add buttons in the new order
-            }
-        }
-        revalidate(); // Revalidate the panel to update the layout
-        repaint();    // Repaint the panel to reflect changes
-    }
-
-    public void resetState(){
-        for (int i = 0; i < 8; i++) {
-            for (int j = 0; j < 8; j++) {
-                if (board.getButton(i, j) != null) {
-                    buttons[i][j].setIcon(board.getButton(i,j).pic);
-                } else {
-                    buttons[i][j].setIcon(null);
-                }
-            }
-        }
-    }
+ 
 
     void updateButtons() {
         for (int i = 0; i < BOARD_SIZE; i++) {

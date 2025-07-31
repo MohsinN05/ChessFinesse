@@ -7,6 +7,7 @@ public class Match {
     public int[] lastMoves;
     Stack<Move> oldMoves;
     private String [] teams = {"White","Black"};
+    boolean check;
     
     public String turn;
     int moves;
@@ -14,6 +15,7 @@ public class Match {
     public Match(){
         moves = 0;
         turn = teams[moves];
+        check = false;
     }
 
     public void nextTurn(){
