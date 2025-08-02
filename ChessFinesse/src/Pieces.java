@@ -21,7 +21,7 @@ public class Pieces {
         board = new Piece[8][8];
         match = new Match();
         initialize();
-        movemap = specify(null, match.turn);
+        movemap = specify(null);
     }
 
     private void initialize() {
@@ -111,15 +111,15 @@ public class Pieces {
 
 
     Map<String,LinkedList<Integer[]>> whichChecking(int i, int j){
-        return board[i][j].showPossibleMoves(this, match.turn, i, j);
+        return board[i][j].showPossibleMoves(this, i, j);
     }
 
     
     public void restrainer(){
-        HashMap<String,LinkedList<Integer[]>> restrict = restrictMoves(match.turn);
+        HashMap<String,LinkedList<Integer[]>> restrict = restrictMoves();
         shiftBoard();
         match.nextTurn();
-        movemap = specify(restrict, match.turn);
+        movemap = specify(restrict);
     }
 
     boolean moveMap(){
@@ -147,7 +147,7 @@ public class Pieces {
     
 
     Map<String,LinkedList<Integer[]>> showValidMoves(int i, int j){
-        return board[i][j].showPossibleMoves(this,match.turn, i, j);
+        return board[i][j].showPossibleMoves(this, i, j);
     }
 
     public boolean matchesKey(HashMap<String,LinkedList<Integer[]>> restrict, int i, int j) {
@@ -161,12 +161,12 @@ public class Pieces {
         return false;
     }
 
-   public HashMap<Integer[],LinkedList<Integer[]>> specify(HashMap<String,LinkedList<Integer[]>> restrict, String turn){
+   public HashMap<Integer[],LinkedList<Integer[]>> specify(HashMap<String,LinkedList<Integer[]>> restrict){
         HashMap<Integer[],LinkedList<Integer[]>> save = new HashMap<>();
         System.out.println(restrict);
         for (int i = 0; i < BOARD_SIZE; i++) {
             for (int j = 0; j < BOARD_SIZE; j++) {
-                if(getButton(i, j) != null && getButton(i, j).team.equals(turn)){
+                if(getButton(i, j) != null && getButton(i, j).team.equals(match.turn)){
                     if((match.check || (restrict != null && matchesKey(restrict,i,j)))){
                         Integer[] key = new Integer[]{i, j};
                         if(!(match.check && (restrict != null && matchesKey(restrict,i,j)))){
@@ -177,7 +177,7 @@ public class Pieces {
                     }
                     else{
                         Integer[] key = new Integer[]{i, j};
-                        Map<String,LinkedList<Integer[]>> moves = getButton(i, j).showPossibleMoves(this, turn, i, j);
+                        Map<String,LinkedList<Integer[]>> moves = getButton(i, j).showPossibleMoves(this, i, j);
                         save.put(key, moves.get("Attack"));
                         save.get(key).addAll(moves.get("Defence"));
                         if(moves.containsKey("KingSide") && moves.get("KingSide") != null) {
@@ -193,7 +193,7 @@ public class Pieces {
         return save;
     }
 
-    public  HashMap<String,LinkedList<Integer[]>> restrictMoves(String turn){
+    public  HashMap<String,LinkedList<Integer[]>> restrictMoves(){
         Map<String,LinkedList<Integer[]>> save;
         int count = 0;
         HashMap<String,LinkedList<Integer[]>> restrict = new HashMap<>();
@@ -201,8 +201,8 @@ public class Pieces {
         int r = 0;
         for (int i = 0; i < BOARD_SIZE; i++) {
             for (int j = 0; j < BOARD_SIZE; j++) {
-                if(getButton(i, j) != null && getButton(i, j).team.equals(turn)){
-                    save = getButton(i, j).showPossibleMoves(this, turn, i, j);
+                if(getButton(i, j) != null && getButton(i, j).team.equals(match.turn)){
+                    save = getButton(i, j).showPossibleMoves(this, i, j);
                 if((save.get("Check") != null && save.get("Check").size() > 0)){
                         match.check = true;
                         restrict.get("Attack").addAll(save.get("Check"));
@@ -258,26 +258,54 @@ public class Pieces {
 }
 
  
-    public Set<Integer[]> searchForChecks(){
+    public HashMap<String,LinkedList<Integer[]>> LimitMoves(){
+        int r = 0;
+        HashMap<String,LinkedList<Integer[]>> restrict = new HashMap<>();
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
-        Set<Integer[]> checking = new HashSet<>();
-        String[] keys = new String[]{"Defence","Neighbor","Check"};
         for (int i = 0; i < BOARD_SIZE; i++) {
             for (int j = 0; j < BOARD_SIZE; j++) {
-                if(getButton(i, j) != null && getButton(i, j).team.equals(match.notTurn())){
+                if(getButton(i, j) != null && getButton(i, j).team.equals(match.turn) && !(getButton(i, j) instanceof King)){
                     moves = whichChecking(i, j);
-                    for (String key : keys) {
-                        if(moves.get(key) != null) {
-                        checking.addAll(moves.get(key));
+                    if(moves.get("Check") == null && moves.get("Check").size() == 0 && moves.containsKey("Restrict") &&  moves.get("Restrict").size() > 0){
+                        restrict.put("Defence" + ++r, new LinkedList<>());
+                            for (Integer[] move : moves.get("Restrict")) {
+                                if (board[move[0]][move[1]]!=null) {
+                                    restrict.get("Defence" + r).addFirst(move);
+                                }
+                                else {
+                                    restrict.get("Defence" + r).add(move);
+                                }
+                            }
+                            restrict.get("Defence" + r).add(new Integer[]{i, j});
                     }
-                    if(moves.get("Check") != null && moves.containsKey("Restrict")) {
-                        checking.addAll(moves.get("Restrict"));
-                    }
-                }
                 }
             }
         }
-        return checking;
+        return restrict;
+    }
+
+    public HashMap<Integer[],LinkedList<Integer[]>> SearchForMoves(HashMap<String,LinkedList<Integer[]>> restrict){
+        HashMap<Integer[],LinkedList<Integer[]>> save = new HashMap<>();
+        System.out.println(restrict);
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            for (int j = 0; j < BOARD_SIZE; j++) {
+                if(getButton(i, j) != null && getButton(i, j).team.equals(match.notTurn())){
+                    if((restrict != null && matchesKey(restrict,i,j))){
+                        Integer[] key = new Integer[]{i, j};
+                        LinkedList<Integer[]> moves = getButton(i, j).savingMoves(this, restrict, i, j);
+                        if(moves == null) continue;
+                        save.put(key, moves);
+                    }
+                    else{
+                        Integer[] key = new Integer[]{i, j};
+                        Map<String,LinkedList<Integer[]>> moves = getButton(i, j).showPossibleMoves(this, i, j);
+                        save.put(key, moves.get("Attack"));
+                        save.get(key).addAll(moves.get("Defence"));
+                    }
+                }
+            }
+        }
+        return save;
     }
 
     

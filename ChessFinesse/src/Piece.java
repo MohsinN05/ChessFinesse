@@ -24,7 +24,7 @@ abstract class Piece {
 
     public abstract Piece copy();
 
-    public abstract Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y);
+    public abstract Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y);
 
     public abstract LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y);
 
@@ -86,21 +86,20 @@ class King extends Piece{
 
     
     
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
         moves.put("Neighbor", new LinkedList<>());
-        if(team.equals(turn)){
+        if(team.equals(bo.match.turn)){
+            HashMap<String,LinkedList<Integer[]>> restrain = bo.LimitMoves();
+            bo.shiftBoard();
+            HashMap<Integer[],LinkedList<Integer[]>> s1 = bo.SearchForMoves(restrain);
             bo.shiftBoard();
             Set<Integer[]> save = new HashSet<>();
-            HashMap<String, LinkedList<Integer[]>> restrict = bo.restrictMoves(this.team);
-            bo.shiftBoard();
-            HashMap<Integer[],LinkedList<Integer[]>> s1 = bo.specify(restrict, bo.match.notTurn());
-            for(LinkedList<Integer[]> scr: s1.values()){
-                save.addAll(scr);
+            for (LinkedList<Integer[]> list : s1.values()) {
+                save.addAll(list);
             }
-            bo.shiftBoard();
             Set<LinkedList<Integer>> a = bo.coordinateOfChecking(save);
             for(int i = 1;Math.abs(i)<2;i--){
                 for(int j = 1;Math.abs(j)<2;j--){
@@ -161,7 +160,7 @@ class King extends Piece{
     }
 
     public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref , int x, int y){
-        Map<String,LinkedList<Integer[]>> moves = showPossibleMoves(bo, team, x, y);
+        Map<String,LinkedList<Integer[]>> moves = showPossibleMoves(bo, x, y);
         LinkedList<Integer[]> saving = new LinkedList<>();
         saving.addAll(moves.get("Defence"));
         saving.addAll(moves.get("Attack"));
@@ -205,7 +204,7 @@ class Pawn extends Piece{
         return "ChessFinesse//Pics&Vids//Pics//b_pawn_1x.png";
     }
 
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
@@ -364,7 +363,7 @@ class Knight extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
@@ -453,7 +452,7 @@ class Queen extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
@@ -1284,7 +1283,7 @@ class Rook extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
@@ -1720,7 +1719,7 @@ class Bishop extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
