@@ -24,9 +24,9 @@ abstract class Piece {
 
     public abstract Piece copy();
 
-    public abstract Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y);
+    public abstract Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y);
 
-    public abstract ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y);
+    public abstract LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y);
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
@@ -59,18 +59,49 @@ class King extends Piece{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
+    public boolean[] castling(Pieces board,Set<LinkedList<Integer>> ref, int x, int y) {
+        boolean queenSide = false, kingSide = false;
+        if(!hasMoved && !board.match.check){
+            for(int i = 1;y-i>=0;i++){
+                if(((y-i == 0 && board.board[x][y-i] != null && board.board[x][y-i].getClass().equals(Rook.class) & !board.board[x][y-i].hasMoved) || (y-i != 0 && board.board[x][y-i] == null)) && !ref.contains(Arrays.asList(x, y-i))){
+                    queenSide = true;
+                }
+                else{
+                    queenSide = false;
+                    break;
+                }
+            }
+            for(int i = 1;y+i<8;i++){
+                if(((y+i == 7 && board.board[x][y+i] != null && board.board[x][y+i].getClass().equals(Rook.class) & !board.board[x][y+i].hasMoved) || (y+i != 7 && board.board[x][y+i] == null)) && !ref.contains(Arrays.asList(x, y+i))){
+                    kingSide = true;
+                }
+                else{
+                    kingSide = false;
+                    break;
+                }
+            }
+        }
+        return new boolean[]{queenSide, kingSide};
+    }
+
     
     
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
-        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
-        moves.put("Defence", new ArrayList<>());
-        moves.put("Attack", new ArrayList<>());
-        moves.put("Neighbor", new ArrayList<>());
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+        Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new LinkedList<>());
+        moves.put("Attack", new LinkedList<>());
+        moves.put("Neighbor", new LinkedList<>());
         if(team.equals(turn)){
             bo.shiftBoard();
-            Set<Integer[]> save = bo.searchForChecks();
+            Set<Integer[]> save = new HashSet<>();
+            HashMap<String, LinkedList<Integer[]>> restrict = bo.restrictMoves(this.team);
             bo.shiftBoard();
-            Set<List<Integer>> a = bo.coordinateOfChecking(save);
+            HashMap<Integer[],LinkedList<Integer[]>> s1 = bo.specify(restrict, bo.match.notTurn());
+            for(LinkedList<Integer[]> scr: s1.values()){
+                save.addAll(scr);
+            }
+            bo.shiftBoard();
+            Set<LinkedList<Integer>> a = bo.coordinateOfChecking(save);
             for(int i = 1;Math.abs(i)<2;i--){
                 for(int j = 1;Math.abs(j)<2;j--){
                     if(i == 0 && j == 0)continue;
@@ -87,7 +118,29 @@ class King extends Piece{
                     }catch(Exception e){}      
                 }
             }
-            System.out.println(moves);
+            if(!bo.match.check){
+                boolean[] castling = castling(bo, a, x, y);
+                if(this.team.equals("White")){
+                    if(castling[0]){
+                        moves.put("QueenSide", new LinkedList<>());
+                        moves.get("QueenSide").add(new Integer[]{x, y-2});
+                    }
+                    if(castling[1]){
+                        moves.put("KingSide", new LinkedList<>());
+                        moves.get("KingSide").add(new Integer[]{x, y+2});
+                    }
+                }
+                else{
+                    if(castling[0]){
+                        moves.put("KingSide", new LinkedList<>());
+                        moves.get("KingSide").add(new Integer[]{x, y-2});
+                    }
+                    if(castling[1]){
+                        moves.put("QueenSide", new LinkedList<>());
+                        moves.get("QueenSide").add(new Integer[]{x, y+2});
+                    }
+                }
+            }
         }
         else{
             for(int i = 1;Math.abs(i)<2;i--){
@@ -107,9 +160,9 @@ class King extends Piece{
         return moves; 
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref , int x, int y){
-        Map<String,ArrayList<Integer[]>> moves = showPossibleMoves(bo, team, x, y);
-        ArrayList<Integer[]> saving = new ArrayList<>();
+    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref , int x, int y){
+        Map<String,LinkedList<Integer[]>> moves = showPossibleMoves(bo, team, x, y);
+        LinkedList<Integer[]> saving = new LinkedList<>();
         saving.addAll(moves.get("Defence"));
         saving.addAll(moves.get("Attack"));
         return saving;
@@ -152,12 +205,12 @@ class Pawn extends Piece{
         return "ChessFinesse//Pics&Vids//Pics//b_pawn_1x.png";
     }
 
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
-        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
-        moves.put("Defence", new ArrayList<>());
-        moves.put("Attack", new ArrayList<>());
-        moves.put("Neighbor", new ArrayList<>());
-        moves.put("Check", new ArrayList<>());
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+        Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new LinkedList<>());
+        moves.put("Attack", new LinkedList<>());
+        moves.put("Neighbor", new LinkedList<>());
+        moves.put("Check", new LinkedList<>());
         int i = 1;
         while((i<=1+(hasMoved?0:1))&&(x-i>=0)){
             if(bo.board[x-i][y]==null){        
@@ -189,7 +242,7 @@ class Pawn extends Piece{
                     moves.get("Neighbor").add(new Integer[]{x-1,y-1});
                 }
                 else{
-                    if(bo.board[x-1][y-1].getClass().equals(King.class)){
+                    if(bo.board[x-1][y-1] instanceof King){
                         moves.get("Check").add(new Integer[]{x-1,y-1});
                     }
                     else{
@@ -201,22 +254,27 @@ class Pawn extends Piece{
         return moves;
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y){
-        ArrayList<Integer[]> saving = new ArrayList<>();
+    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
+        LinkedList<Integer[]> saving = new LinkedList<>();
         int i = 1;
         while((i<=1+(hasMoved?0:1))&&(x-i>=0)){
             if(bo.board[x-i][y]==null){
-                if(ref.get("Defence").contains(new Integer[]{x,y})){
-                    for (Integer[] arr : ref.get("Path")) {
-                        if(Arrays.equals(arr, new Integer[]{x-i,y})) {
+                if(ref.get("Attack") != null && ref.get("Attack").size() > 0){
+                    for (Integer[] arr3 : ref.get("Attack")) {
+                        if(Arrays.equals(arr3, new Integer[]{x-i,y})) {
                             saving.add(new Integer[]{x-i,y});
                         }
                     }
                 }
                 else{
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x,y+i})) {
-                            saving.add(new Integer[]{x,y+i});
+                    for(String arr : ref.keySet()) {
+                        if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x,y})){
+                            for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                Integer[] arr2 = ref.get(arr).get(idx);
+                                if(Arrays.equals(arr2, new Integer[]{x-i,y})) {
+                                    saving.add(new Integer[]{x-i,y});
+                                }
+                            }
                         }
                     }
                 }
@@ -228,17 +286,22 @@ class Pawn extends Piece{
         }
         try{
             if(bo.board[x-1][y+1]!=null && !bo.board[x-1][y+1].team.equals(this.team)){
-                if(ref.get("Defence").contains(new Integer[]{x,y})) {
-                    for (Integer[] arr : ref.get("Path")) {
+                if(ref.get("Attack") != null && ref.get("Attack").size() > 0){
+                    for (Integer[] arr : ref.get("Attack")) {
                         if(Arrays.equals(arr, new Integer[]{x-1,y+1})) {
                             saving.add(new Integer[]{x-1,y+1});
                         }
                     }
                 }
                 else{
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x-1,y+1})) {
-                            saving.add(new Integer[]{x-1,y+1});
+                    for(String arr : ref.keySet()) {
+                        if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x,y})){
+                            for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                    Integer[] arr2 = ref.get(arr).get(idx);
+                                if(Arrays.equals(arr2, new Integer[]{x-1,y+1})) {
+                                    saving.add(new Integer[]{x-1,y+1});
+                                }
+                            }
                         }
                     }
                 }
@@ -246,17 +309,22 @@ class Pawn extends Piece{
         }catch(Exception e){}
         try{
             if(bo.board[x-1][y-1]!=null && !bo.board[x-1][y-1].team.equals(this.team)){
-                if(ref.get("Defence").contains(new Integer[]{x,y})) {
-                    for (Integer[] arr : ref.get("Path")) {
+                if(ref.get("Attack") != null && ref.get("Attack").size() > 0){
+                    for (Integer[] arr : ref.get("Attack")) {
                         if(Arrays.equals(arr, new Integer[]{x-1,y-1})) {
                             saving.add(new Integer[]{x-1,y-1});
                         }
                     }
                 }
                 else{
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x-1,y-1})) {
-                            saving.add(new Integer[]{x-1,y-1});
+                    for(String arr : ref.keySet()) {
+                        if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x,y})){
+                            for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                if(Arrays.equals(arr2, new Integer[]{x-1,y-1})) {
+                                    saving.add(new Integer[]{x-1,y-1});
+                                }
+                            }
                         }
                     }
                 }
@@ -296,12 +364,12 @@ class Knight extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
-        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
-        moves.put("Defence", new ArrayList<>());
-        moves.put("Attack", new ArrayList<>());
-        moves.put("Neighbor", new ArrayList<>());
-        moves.put("Check", new ArrayList<>());
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+        Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new LinkedList<>());
+        moves.put("Attack", new LinkedList<>());
+        moves.put("Neighbor", new LinkedList<>());
+        moves.put("Check", new LinkedList<>());
         for(int i = 2;Math.abs(i)<=2;i--){
             for(int j = 2;Math.abs(j)<=2;j--){
                 if(Math.abs(i) == Math.abs(j) || i == 0 || j == 0)continue;
@@ -326,24 +394,29 @@ class Knight extends Pawn{
         return moves;
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y){
-        ArrayList<Integer[]> saving = new ArrayList<>();
+    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
+        LinkedList<Integer[]> saving = new LinkedList<>();
         for(int i = 2;Math.abs(i)<=2;i--){
             for(int j = 2;Math.abs(j)<=2;j--){
                 if(Math.abs(i) == Math.abs(j) || i == 0 || j == 0)continue;
                 try{
                     if(bo.board[x+i][y+j]==null || !bo.board[x+i][y+j].team.equals(this.team)){
-                        if(ref.get("Defence").contains(new Integer[]{x,y})){
-                            for (Integer[] arr : ref.get("Path")) {
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0){
+                            for (Integer[] arr : ref.get("Attack")) {
                                 if(Arrays.equals(arr, new Integer[]{x+i,y+j})) {
                                     saving.add(new Integer[]{x+i,y+j});
                                 }
                             }
                         }
                         else{
-                            for (Integer[] arr : ref.get("Attack")) {
-                                if(Arrays.equals(arr, new Integer[]{x+i,y+j})) {
-                                    saving.add(new Integer[]{x+i,y+j});
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x,y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x+i,y+j})) {
+                                            saving.add(new Integer[]{x+i,y+j});
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -380,14 +453,14 @@ class Queen extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
-        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
-        moves.put("Defence", new ArrayList<>());
-        moves.put("Attack", new ArrayList<>());
-        moves.put("Neighbor", new ArrayList<>());
-        moves.put("Check", new ArrayList<>());
-        moves.put("Restrict", new ArrayList<>());
-        ArrayList<Integer[]> hL = new ArrayList<>(), hR = new ArrayList<>(), vU = new ArrayList<>(), vD = new ArrayList<>(), rU = new ArrayList<>(), rD = new ArrayList<>(), lU = new ArrayList<>(), lD = new ArrayList<>();
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+        Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new LinkedList<>());
+        moves.put("Attack", new LinkedList<>());
+        moves.put("Neighbor", new LinkedList<>());
+        moves.put("Check", new LinkedList<>());
+        moves.put("Restrict", new LinkedList<>());
+        LinkedList<Integer[]> hL = new LinkedList<>(), hR = new LinkedList<>(), vU = new LinkedList<>(), vD = new LinkedList<>(), rU = new LinkedList<>(), rD = new LinkedList<>(), lU = new LinkedList<>(), lD = new LinkedList<>();
         boolean isCheckhLeft=false,isCheckhRight = false,isCheckvUp=false,isCheckvDown=false,isCheckrightUp=false,isCheckrightDown=false,isCheckleftUp=false,isCheckleftDown=false;
         boolean CheckvUp=false,CheckvDown=false,CheckhLeft=false,CheckhRight = false;
         boolean vUp=true,vDown=true,hLeft=true,hRight = true;
@@ -401,12 +474,14 @@ class Queen extends Pawn{
                         if(bo.board[x][y+i].team.equals(this.team)){
                             hRight = false;
                             moves.get("Neighbor").add(new Integer[]{x,y+i});
+                            if(!CheckhRight)
                             moves.get("Defence").addAll(hR);
                             hR.clear();
                         }
                         else{
                             if(bo.board[x][y+i].getClass().equals(King.class)){
                                 if(!CheckhRight){
+                                    moves.get("Check").add(new Integer[]{x,y+i});
                                     moves.get("Check").addAll(hR);
                                     hR.clear();
                                     isCheckhRight = true;
@@ -465,12 +540,14 @@ class Queen extends Pawn{
                         if(bo.board[x][y-i].team.equals(this.team)){
                             hLeft = false;
                             moves.get("Neighbor").add(new Integer[]{x,y-i});
+                            if(!CheckhLeft)
                             moves.get("Defence").addAll(hL);
                             hL.clear();
                         }
                         else{
                             if(bo.board[x][y-i].getClass().equals(King.class)){
                                 if(!CheckhLeft){
+                                    moves.get("Check").add(new Integer[]{x,y-i});
                                     moves.get("Check").addAll(hL);
                                     hL.clear();
                                     isCheckhLeft = true;
@@ -527,12 +604,14 @@ class Queen extends Pawn{
                         if(bo.board[x+i][y].team.equals(this.team)){
                             vUp = false;
                             moves.get("Neighbor").add(new Integer[]{x+i,y});
+                            if(!CheckvUp)
                             moves.get("Defence").addAll(vU);
                             vU.clear();
                         }
                         else{
                             if(bo.board[x+i][y].getClass().equals(King.class)){
                                 if(!CheckvUp){
+                                    moves.get("Check").add(new Integer[]{x+i,y});
                                     moves.get("Check").addAll(vU);
                                     vU.clear();
                                     isCheckvUp = true;
@@ -590,12 +669,14 @@ class Queen extends Pawn{
                         if(bo.board[x-i][y].team.equals(this.team)){
                             vDown = false;
                             moves.get("Neighbor").add(new Integer[]{x-i,y});
+                            if(!CheckvDown)
                             moves.get("Defence").addAll(vD);
                             vD.clear();
                         }
                         else{
                             if(bo.board[x-i][y].getClass().equals(King.class)){
                                 if(!CheckvDown){
+                                    moves.get("Check").add(new Integer[]{x-i,y});
                                     moves.get("Check").addAll(vD);
                                     vD.clear();
                                     isCheckvDown = true;
@@ -652,12 +733,14 @@ class Queen extends Pawn{
                         if(bo.board[x+i][y+i].team.equals(this.team)){
                             rightUp = false;
                             moves.get("Neighbor").add(new Integer[]{x+i,y+i});
+                            if(!CheckrightUp)
                             moves.get("Defence").addAll(rU);
                             rU.clear();
                         }
                         else{
                             if(bo.board[x+i][y+i].getClass().equals(King.class)){
                                 if(!CheckrightUp){
+                                    moves.get("Check").add(new Integer[]{x+i,y+i});
                                     moves.get("Check").addAll(rU);
                                     rU.clear();
                                     isCheckrightUp = true;
@@ -715,12 +798,14 @@ class Queen extends Pawn{
                         if(bo.board[x+i][y-i].team.equals(this.team)){
                             leftDown = false;
                             moves.get("Neighbor").add(new Integer[]{x+i,y-i});
+                            if(!CheckleftDown)
                             moves.get("Defence").addAll(lD);
                             lD.clear();
                         }
                         else{
                             if(bo.board[x+i][y-i].getClass().equals(King.class)){
                                 if(!CheckleftDown){
+                                    moves.get("Check").add(new Integer[]{x+i,y-i});
                                     moves.get("Check").addAll(lD);
                                     lD.clear();
                                     isCheckleftDown = true;
@@ -779,12 +864,14 @@ class Queen extends Pawn{
                         if(bo.board[x-i][y+i].team.equals(this.team)){
                             leftUp = false;
                             moves.get("Neighbor").add(new Integer[]{x-i,y+i});
+                            if(!CheckleftUp)
                             moves.get("Defence").addAll(lU);
                             lU.clear();
                         }
                         else{
                             if(bo.board[x-i][y+i].getClass().equals(King.class)){
                                 if(!CheckleftUp){
+                                    moves.get("Check").add(new Integer[]{x-i,y+i});
                                     moves.get("Check").addAll(lU);
                                     lU.clear();
                                     isCheckleftUp = true;
@@ -843,12 +930,14 @@ class Queen extends Pawn{
                         if(bo.board[x-i][y-i].team.equals(this.team)){
                             rightDown = false;
                             moves.get("Neighbor").add(new Integer[]{x-i,y-i});
+                            if(!CheckrightDown)
                             moves.get("Defence").addAll(rD);
                             rD.clear();
                         }
                         else{
                             if(bo.board[x-i][y-i].getClass().equals(King.class)){
                                 if(!CheckrightDown){
+                                    moves.get("Check").add(new Integer[]{x-i,y-i});
                                     moves.get("Check").addAll(rD);
                                     rD.clear();
                                     isCheckrightDown = true;
@@ -904,210 +993,269 @@ class Queen extends Pawn{
         return moves;
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y){
-        ArrayList<Integer[]> saving = new ArrayList<>();
+    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
+        LinkedList<Integer[]> saving = new LinkedList<>();
         boolean vUp=true,vDown=true,hLeft=true,hRight = true;
         boolean leftUp=true,leftDown=true,rightUp=true,rightDown = true;
         for(int i = 1;i<8;i++){
-            if(ref.get("Defence") != null && ref.get("Defence").contains(new Integer[]{x,y})){
-                if(hRight){
-                    try{
-                        if(bo.board[x][y+i]!=null && !bo.board[x][y+i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x,y+i})) {
+            if(hRight){
+                try{
+                    if(bo.board[x][y+i]==null || (bo.board[x][y+i]!=null && !bo.board[x][y+i].team.equals(this.team))){
+                        if(bo.board[x][y+i]!=null)
+                        hRight = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x,y+i})) {
                                     saving.add(new Integer[]{x,y+i});
                                 }
                             }
                         }
-                    }catch(Exception e){}
-                }
-                else{
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x,y+i})) {
+                                            saving.add(new Integer[]{x,y+i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else{
+                        hRight = false;
+                    }
+                }catch(Exception e){
                     hRight = false;
                 }
-                if(hLeft){
-                    try{
-                        if(bo.board[x][y-i]!=null && !bo.board[x][y-i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x,y-i})) {
+            }
+            if(hLeft){
+                try{
+                    if(bo.board[x][y-i]==null || (bo.board[x][y-i]!=null && !bo.board[x][y-i].team.equals(this.team))){
+                        if(bo.board[x][y-i]!=null)
+                        hLeft = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x,y-i})) {
                                     saving.add(new Integer[]{x,y-i});
                                 }
                             }
                         }
-                    }catch(Exception e){}
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x,y-i})) {
+                                            saving.add(new Integer[]{x,y-i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                     else{
                         hLeft = false;
+                    }
+                }catch(Exception e){
+                    hLeft = false;
                 }
+            }
+            if(vUp){
                 try{
-                    if(vDown){
-                        if(bo.board[x+i][y]!=null && !bo.board[x+i][y].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x+i,y})) {
+                    if(bo.board[x+i][y]==null || (bo.board[x+i][y]!=null && !bo.board[x+i][y].team.equals(this.team))){
+                        if(bo.board[x+i][y]!=null)
+                        vUp = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x+i,y})) {
                                     saving.add(new Integer[]{x+i,y});
                                 }
                             }
                         }
-                    }else{
-                        vDown = false;
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x+i,y})) {
+                                            saving.add(new Integer[]{x+i,y});
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }catch(Exception e){}
+                    else{
+                        vUp = false;
+                    }
+                }catch(Exception e){
+                    vUp = false;
+                }
+            }
+            if(vDown){
                 try{
-                    if(vUp){
-                        if(bo.board[x-i][y]!=null && !bo.board[x-i][y].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x-i,y})) {
+                    if(bo.board[x-i][y]==null || (bo.board[x-i][y]!=null && !bo.board[x-i][y].team.equals(this.team))){
+                        if(bo.board[x-i][y]!=null)
+                        vDown = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x-i,y})) {
                                     saving.add(new Integer[]{x-i,y});
                                 }
                             }
                         }
-                    }else{
-                        vUp = false;
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x-i,y})) {
+                                            saving.add(new Integer[]{x-i,y});
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }catch(Exception e){}
+                    else{
+                        vDown = false;
+                    }
+                }catch(Exception e){
+                    vDown = false;
+                }
+            }
+            if(rightUp){
                 try{
-                    if(rightDown){
-                        if(bo.board[x+i][y+i]!=null && !bo.board[x+i][y+i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x+i,y+i})) {
+                    if(bo.board[x+i][y+i]==null || (bo.board[x+i][y+i]!=null && !bo.board[x+i][y+i].team.equals(this.team))){
+                        if(bo.board[x+i][y+i]!=null)
+                        rightUp = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x+i,y+i})) {
                                     saving.add(new Integer[]{x+i,y+i});
                                 }
                             }
                         }
-                    }else{
-                        rightDown = false;
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x+i,y+i})) {
+                                            saving.add(new Integer[]{x+i,y+i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }catch(Exception e){}
+                    else{
+                        rightUp = false;
+                    }
+                }catch(Exception e){
+                    rightUp = false;
+                }
+            }
+            if(leftDown){
                 try{
-                    if(leftUp){
-                        if(bo.board[x+i][y-i]!=null && !bo.board[x+i][y-i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x+i,y-i})) {
+                    if(bo.board[x+i][y-i]==null || (bo.board[x+i][y-i]!=null && !bo.board[x+i][y-i].team.equals(this.team))){
+                        if(bo.board[x+i][y-i]!=null)
+                        leftDown = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x+i,y-i})) {
                                     saving.add(new Integer[]{x+i,y-i});
                                 }
                             }
                         }
-                    }else{
-                        leftUp = false;
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x+i,y-i})) {
+                                            saving.add(new Integer[]{x+i,y-i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }catch(Exception e){}
+                    else{
+                        leftDown = false;
+                    }
+                }catch(Exception e){
+                    leftDown = false;
+                }
+            }
+            if(leftUp){
                 try{
-                    if(rightUp){
-                        if(bo.board[x-i][y+i]!=null && !bo.board[x-i][y+i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x-i,y+i})) {
+                    if(bo.board[x-i][y+i]==null || (bo.board[x-i][y+i]!=null && !bo.board[x-i][y+i].team.equals(this.team))){
+                        if(bo.board[x-i][y+i]!=null)
+                        leftUp = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x-i,y+i})) {
                                     saving.add(new Integer[]{x-i,y+i});
                                 }
                             }
                         }
-                    }else{
-                        rightUp = false;
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x-i,y+i})) {
+                                            saving.add(new Integer[]{x-i,y+i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }catch(Exception e){}
+                    else{
+                        leftUp = false;
+                    }
+                }catch(Exception e){
+                    leftUp = false;
+                }
+            }
+            if(rightDown){
                 try{
-                    if(leftDown){
-                        if(bo.board[x-i][y-i]!=null && !bo.board[x-i][y-i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x-i,y-i})) {
+                    if(bo.board[x-i][y-i]==null || (bo.board[x-i][y-i]!=null && !bo.board[x-i][y-i].team.equals(this.team))){
+                        if(bo.board[x-i][y-i]!=null)
+                        rightDown = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x-i,y-i})) {
                                     saving.add(new Integer[]{x-i,y-i});
                                 }
                             }
                         }
-                    }else{
-                        leftDown = false;
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x-i,y-i})) {
+                                            saving.add(new Integer[]{x-i,y-i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }catch(Exception e){}
+                    else{
+                        rightDown = false;
+                    }
+                }catch(Exception e){
+                    rightDown = false;
+                }
             }
-            else{
-                try{
-                if(hRight && (bo.board[x][y+i]==null || !bo.board[x][y+i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x,y+i})) {
-                            saving.add(new Integer[]{x,y+i});
-                        }
-                    }
-                }
-                else
-                hRight = false;
-            }catch(Exception e){}
-            try{
-                if(hLeft && (bo.board[x][y-i]==null || !bo.board[x][y-i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x,y-i})) {
-                            saving.add(new Integer[]{x,y-i});
-                        }
-                    }
-                }
-                else
-                hLeft = false;
-            }catch(Exception e){}
-            try{
-                if(vDown && (bo.board[x+i][y]==null || !bo.board[x+i][y].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x+i,y})) {
-                            saving.add(new Integer[]{x+i,y});
-                        }
-                    }
-                }
-                else
-                vDown = false;
-            }catch(Exception e){}
-            try{
-                if(vUp && (bo.board[x-i][y]==null || !bo.board[x-i][y].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x-i,y})) {
-                            saving.add(new Integer[]{x-i,y});
-                        }
-                    }
-                }
-                else
-                vUp = false;
-            }catch(Exception e){}
-            try{
-                if(rightDown && (bo.board[x+i][y+i]==null || !bo.board[x+i][y+i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x+i,y+i})) {
-                            saving.add(new Integer[]{x+i,y+i});
-                        }
-                    }
-                }
-                else
-                rightDown = false;
-            }catch(Exception e){}
-            try{
-                if(leftUp && (bo.board[x+i][y-i]==null || !bo.board[x+i][y-i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x+i,y-i})) {
-                            saving.add(new Integer[]{x+i,y-i});
-                        }
-                    }
-                }
-                else
-                leftUp = false;
-            }catch(Exception e){}
-            try{
-                if(rightUp && (bo.board[x-i][y+i]==null || !bo.board[x-i][y+i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x-i,y+i})) {
-                            saving.add(new Integer[]{x-i,y+i});
-                        }
-                    }
-                }
-                else
-                rightUp = false;
-            }catch(Exception e){}
-            try{
-                if(leftDown && (bo.board[x-i][y-i]==null || !bo.board[x-i][y-i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x-i,y-i})) {
-                            saving.add(new Integer[]{x-i,y-i});
-                        }
-                    }
-                }
-                else
-                leftDown = false;
-            }catch(Exception e){}
-            }
-        } 
+        }
+        
         return saving;
     }
 
@@ -1136,14 +1284,14 @@ class Rook extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
-        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
-        moves.put("Defence", new ArrayList<>());
-        moves.put("Attack", new ArrayList<>());
-        moves.put("Neighbor", new ArrayList<>());
-        moves.put("Check", new ArrayList<>());
-        moves.put("Restrict", new ArrayList<>());
-        ArrayList<Integer[]> hL = new ArrayList<>(), hR = new ArrayList<>(), vU = new ArrayList<>(), vD = new ArrayList<>();
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+        Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new LinkedList<>());
+        moves.put("Attack", new LinkedList<>());
+        moves.put("Neighbor", new LinkedList<>());
+        moves.put("Check", new LinkedList<>());
+        moves.put("Restrict", new LinkedList<>());
+        LinkedList<Integer[]> hL = new LinkedList<>(), hR = new LinkedList<>(), vU = new LinkedList<>(), vD = new LinkedList<>();
         boolean isCheckhLeft=false,isCheckhRight = false,isCheckvUp=false,isCheckvDown=false;
         boolean CheckvUp=false,CheckvDown=false,CheckhLeft=false,CheckhRight = false;
         boolean vUp=true,vDown=true,hLeft=true,hRight = true;
@@ -1154,12 +1302,14 @@ class Rook extends Pawn{
                         if(bo.board[x][y+i].team.equals(this.team)){
                             hRight = false;
                             moves.get("Neighbor").add(new Integer[]{x,y+i});
+                            if(!CheckhRight)
                             moves.get("Defence").addAll(hR);
                             hR.clear();
                         }
                         else{
                             if(bo.board[x][y+i].getClass().equals(King.class)){
                                 if(!CheckhRight){
+                                    moves.get("Check").add(new Integer[]{x,y+i});
                                     moves.get("Check").addAll(hR);
                                     hR.clear();
                                     isCheckhRight = true;
@@ -1218,12 +1368,14 @@ class Rook extends Pawn{
                         if(bo.board[x][y-i].team.equals(this.team)){
                             hLeft = false;
                             moves.get("Neighbor").add(new Integer[]{x,y-i});
+                            if(!CheckhLeft)
                             moves.get("Defence").addAll(hL);
                             hL.clear();
                         }
                         else{
                             if(bo.board[x][y-i].getClass().equals(King.class)){
                                 if(!CheckhLeft){
+                                    moves.get("Check").add(new Integer[]{x,y-i});
                                     moves.get("Check").addAll(hL);
                                     hL.clear();
                                     isCheckhLeft = true;
@@ -1280,12 +1432,14 @@ class Rook extends Pawn{
                         if(bo.board[x+i][y].team.equals(this.team)){
                             vUp = false;
                             moves.get("Neighbor").add(new Integer[]{x+i,y});
+                            if(!CheckvUp)
                             moves.get("Defence").addAll(vU);
                             vU.clear();
                         }
                         else{
                             if(bo.board[x+i][y].getClass().equals(King.class)){
                                 if(!CheckvUp){
+                                    moves.get("Check").add(new Integer[]{x+i,y});
                                     moves.get("Check").addAll(vU);
                                     vU.clear();
                                     isCheckvUp = true;
@@ -1343,12 +1497,14 @@ class Rook extends Pawn{
                         if(bo.board[x-i][y].team.equals(this.team)){
                             vDown = false;
                             moves.get("Neighbor").add(new Integer[]{x-i,y});
+                            if(!CheckvDown)
                             moves.get("Defence").addAll(vD);
                             vD.clear();
                         }
                         else{
                             if(bo.board[x-i][y].getClass().equals(King.class)){
                                 if(!CheckvDown){
+                                    moves.get("Check").add(new Integer[]{x-i,y});
                                     moves.get("Check").addAll(vD);
                                     vD.clear();
                                     isCheckvDown = true;
@@ -1403,112 +1559,138 @@ class Rook extends Pawn{
         return moves;
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y){
-        ArrayList<Integer[]> saving = new ArrayList<>();
+    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
+        LinkedList<Integer[]> saving = new LinkedList<>();
         boolean vUp=true,vDown=true,hLeft=true,hRight = true;
         for(int i = 1;i<8;i++){
-            if(ref.get("Defence") != null && ref.get("Defence").contains(new Integer[]{x,y})){
-                if(hRight){
-                    try{
-                        if(bo.board[x][y+i]!=null && !bo.board[x][y+i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x,y+i})) {
+            if(hRight){
+                try{
+                    if(bo.board[x][y+i]==null || (bo.board[x][y+i]!=null && !bo.board[x][y+i].team.equals(this.team))){
+                        if(bo.board[x][y+i]!=null)
+                        hRight = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x,y+i})) {
                                     saving.add(new Integer[]{x,y+i});
                                 }
                             }
                         }
-                    }catch(Exception e){}
-                }
-                else{
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x,y+i})) {
+                                            saving.add(new Integer[]{x,y+i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else{
+                        hRight = false;
+                    }
+                }catch(Exception e){
                     hRight = false;
                 }
-                if(hLeft){
-                    try{
-                        if(bo.board[x][y-i]!=null && !bo.board[x][y-i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x,y-i})) {
+            }
+            if(hLeft){
+                try{
+                    if(bo.board[x][y-i]==null || (bo.board[x][y-i]!=null && !bo.board[x][y-i].team.equals(this.team))){
+                        if(bo.board[x][y-i]!=null)
+                        hLeft = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x,y-i})) {
                                     saving.add(new Integer[]{x,y-i});
                                 }
                             }
                         }
-                    }catch(Exception e){}
-                }
-                else{
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x,y-i})) {
+                                            saving.add(new Integer[]{x,y-i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else{
+                        hLeft = false;
+                    }
+                }catch(Exception e){
                     hLeft = false;
                 }
+            }
+            if(vUp){
                 try{
-                    if(vDown){
-                        if(bo.board[x+i][y]!=null && !bo.board[x+i][y].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x+i,y})) {
+                    if(bo.board[x+i][y]==null || (bo.board[x+i][y]!=null && !bo.board[x+i][y].team.equals(this.team))){
+                        if(bo.board[x+i][y]!=null)
+                        vUp = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x+i,y})) {
                                     saving.add(new Integer[]{x+i,y});
                                 }
                             }
                         }
-                    }else{
-                        vDown = false;
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x+i,y})) {
+                                            saving.add(new Integer[]{x+i,y});
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }catch(Exception e){}
+                    else{
+                        vUp = false;
+                    }
+                }catch(Exception e){
+                    vUp = false;
+                }
+            }
+            if(vDown){
                 try{
-                    if(vUp){
-                        if(bo.board[x-i][y]!=null && !bo.board[x-i][y].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x-i,y})) {
+                    if(bo.board[x-i][y]==null || (bo.board[x-i][y]!=null && !bo.board[x-i][y].team.equals(this.team))){
+                        if(bo.board[x-i][y]!=null)
+                        vDown = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x-i,y})) {
                                     saving.add(new Integer[]{x-i,y});
                                 }
                             }
                         }
-                    }else{
-                        vUp = false;
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x-i,y})) {
+                                            saving.add(new Integer[]{x-i,y});
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }catch(Exception e){}
+                    else{
+                        vDown = false;
+                    }
+                }catch(Exception e){
+                    vDown = false;
+                }
             }
-            else{
-            try{
-                if(hRight && (bo.board[x][y+i]==null || !bo.board[x][y+i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x,y+i})) {
-                            saving.add(new Integer[]{x,y+i});
-                        }
-                    }
-                }
-                else
-                hRight = false;
-            }catch(Exception e){}
-            try{
-                if(hLeft && (bo.board[x][y-i]==null || !bo.board[x][y-i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x,y-i})) {
-                            saving.add(new Integer[]{x,y-i});
-                        }
-                    }
-                }
-                else
-                hLeft = false;
-            }catch(Exception e){}
-            try{
-                if(vDown && (bo.board[x+i][y]==null || !bo.board[x+i][y].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x+i,y})) {
-                            saving.add(new Integer[]{x+i,y});
-                        }
-                    }
-                }
-                else
-                vDown = false;
-            }catch(Exception e){}
-            try{
-                if(vUp && (bo.board[x-i][y]==null || !bo.board[x-i][y].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x-i,y})) {
-                            saving.add(new Integer[]{x-i,y});
-                        }
-                    }
-                }
-                else
-                vUp = false;
-            }catch(Exception e){}
-        }
     }
         return saving;
     }
@@ -1538,14 +1720,14 @@ class Bishop extends Pawn{
 
     public void promote(ChessBoard cb,Pieces pi,int x,int y){}
 
-    public Map<String,ArrayList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
-        Map<String,ArrayList<Integer[]>> moves = new HashMap<>();
-        moves.put("Defence", new ArrayList<>());
-        moves.put("Attack", new ArrayList<>());
-        moves.put("Neighbor", new ArrayList<>());
-        moves.put("Check", new ArrayList<>());
-        moves.put("Restrict", new ArrayList<>());
-        ArrayList<Integer[]> rU = new ArrayList<>(), rD = new ArrayList<>(), lU = new ArrayList<>(), lD = new ArrayList<>();
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, String turn, int x, int y){
+        Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
+        moves.put("Defence", new LinkedList<>());
+        moves.put("Attack", new LinkedList<>());
+        moves.put("Neighbor", new LinkedList<>());
+        moves.put("Check", new LinkedList<>());
+        moves.put("Restrict", new LinkedList<>());
+        LinkedList<Integer[]> rU = new LinkedList<>(), rD = new LinkedList<>(), lU = new LinkedList<>(), lD = new LinkedList<>();
         boolean isCheckrightUp=false,isCheckrightDown=false,isCheckleftUp=false,isCheckleftDown=false;
         boolean CheckleftUp=false,CheckleftDown=false,CheckrightUp=false,CheckrightDown = false;
         boolean leftUp=true,leftDown=true,rightUp=true,rightDown = true;
@@ -1556,12 +1738,14 @@ class Bishop extends Pawn{
                         if(bo.board[x+i][y+i].team.equals(this.team)){
                             rightUp = false;
                             moves.get("Neighbor").add(new Integer[]{x+i,y+i});
+                            if(!CheckrightUp)
                             moves.get("Defence").addAll(rU);
                             rU.clear();
                         }
                         else{
                             if(bo.board[x+i][y+i].getClass().equals(King.class)){
                                 if(!CheckrightUp){
+                                    moves.get("Check").add(new Integer[]{x+i,y+i});
                                     moves.get("Check").addAll(rU);
                                     rU.clear();
                                     isCheckrightUp = true;
@@ -1619,12 +1803,14 @@ class Bishop extends Pawn{
                         if(bo.board[x+i][y-i].team.equals(this.team)){
                             leftDown = false;
                             moves.get("Neighbor").add(new Integer[]{x+i,y-i});
+                            if(!CheckleftDown)
                             moves.get("Defence").addAll(lD);
                             lD.clear();
                         }
                         else{
                             if(bo.board[x+i][y-i].getClass().equals(King.class)){
                                 if(!CheckleftDown){
+                                    moves.get("Check").add(new Integer[]{x+i,y-i});
                                     moves.get("Check").addAll(lD);
                                     lD.clear();
                                     isCheckleftDown = true;
@@ -1683,12 +1869,14 @@ class Bishop extends Pawn{
                         if(bo.board[x-i][y+i].team.equals(this.team)){
                             leftUp = false;
                             moves.get("Neighbor").add(new Integer[]{x-i,y+i});
+                            if(!CheckleftUp)
                             moves.get("Defence").addAll(lU);
                             lU.clear();
                         }
                         else{
                             if(bo.board[x-i][y+i].getClass().equals(King.class)){
                                 if(!CheckleftUp){
+                                    moves.get("Check").add(new Integer[]{x-i,y+i});
                                     moves.get("Check").addAll(lU);
                                     lU.clear();
                                     isCheckleftUp = true;
@@ -1747,12 +1935,14 @@ class Bishop extends Pawn{
                         if(bo.board[x-i][y-i].team.equals(this.team)){
                             rightDown = false;
                             moves.get("Neighbor").add(new Integer[]{x-i,y-i});
+                            if(!CheckrightDown)
                             moves.get("Defence").addAll(rD);
                             rD.clear();
                         }
                         else{
                             if(bo.board[x-i][y-i].getClass().equals(King.class)){
                                 if(!CheckrightDown){
+                                    moves.get("Check").add(new Integer[]{x-i,y-i});
                                     moves.get("Check").addAll(rD);
                                     rD.clear();
                                     isCheckrightDown = true;
@@ -1808,112 +1998,139 @@ class Bishop extends Pawn{
         return moves;
     }
 
-    public ArrayList<Integer[]> savingMoves(Pieces bo, HashMap<String,ArrayList<Integer[]>> ref, int x, int y){
-        ArrayList<Integer[]> saving = new ArrayList<>();
+    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
+        LinkedList<Integer[]> saving = new LinkedList<>();
         boolean leftUp=true,leftDown=true,rightUp=true,rightDown = true;
         for(int i = 1;i<8;i++){
-            if(ref.get("Defence") != null && ref.get("Defence").contains(new Integer[]{x,y})){
-                if(rightUp){
-                    try{
-                        if(bo.board[x+i][y+i]!=null && !bo.board[x+i][y+i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x+i,y+i})) {
+            if(rightUp){
+                try{
+                    if(bo.board[x+i][y+i]==null || (bo.board[x+i][y+i]!=null && !bo.board[x+i][y+i].team.equals(this.team))){
+                        if(bo.board[x+i][y+i]!=null)
+                        rightUp = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x+i,y+i})) {
                                     saving.add(new Integer[]{x+i,y+i});
                                 }
                             }
                         }
-                    }catch(Exception e){}
-                }
-                else{
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x+i,y+i})) {
+                                            saving.add(new Integer[]{x+i,y+i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else{
+                        rightUp = false;
+                    }
+                }catch(Exception e){
                     rightUp = false;
                 }
-                if(leftDown){
-                    try{
-                        if(bo.board[x+i][y-i]!=null && !bo.board[x+i][y-i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x+i,y-i})) {
+            }
+            if(leftDown){
+                try{
+                    if(bo.board[x+i][y-i]==null || (bo.board[x+i][y-i]!=null && !bo.board[x+i][y-i].team.equals(this.team))){
+                        if(bo.board[x+i][y-i]!=null)
+                        leftDown = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x+i,y-i})) {
                                     saving.add(new Integer[]{x+i,y-i});
                                 }
                             }
                         }
-                    }catch(Exception e){}
-                }
-                else{
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x+i,y-i})) {
+                                            saving.add(new Integer[]{x+i,y-i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else{
+                        leftDown = false;
+                    }
+                }catch(Exception e){
                     leftDown = false;
                 }
+            }
+            if(leftUp){
                 try{
-                    if(leftUp){
-                        if(bo.board[x-i][y+i]!=null && !bo.board[x-i][y+i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x-i,y+i})) {
+                    if(bo.board[x-i][y+i]==null || (bo.board[x-i][y+i]!=null && !bo.board[x-i][y+i].team.equals(this.team))){
+                        if(bo.board[x-i][y+i]!=null)
+                        leftUp = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x-i,y+i})) {
                                     saving.add(new Integer[]{x-i,y+i});
                                 }
                             }
                         }
-                    }else{
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x-i,y+i})) {
+                                            saving.add(new Integer[]{x-i,y+i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else{
                         leftUp = false;
                     }
-                }catch(Exception e){}
+                }catch(Exception e){
+                    leftUp = false;
+                }
+            }
+            if(rightDown){
                 try{
-                    if(rightDown){
-                        if(bo.board[x-i][y-i]!=null && !bo.board[x-i][y-i].team.equals(this.team)){
-                            for (Integer[] arr : ref.get("Path")) {
-                                if(Arrays.equals(arr, new Integer[]{x-i,y-i})) {
+                    if(bo.board[x-i][y-i]==null || (bo.board[x-i][y-i]!=null && !bo.board[x-i][y-i].team.equals(this.team))){
+                        if(bo.board[x-i][y-i]!=null)
+                        rightDown = false;
+                        if(ref.get("Attack") != null && ref.get("Attack").size() > 0 && !bo.matchesKey(ref, x,y)){
+                            for (Integer[] arr3 : ref.get("Attack")) {
+                                if(Arrays.equals(arr3, new Integer[]{x-i,y-i})) {
                                     saving.add(new Integer[]{x-i,y-i});
                                 }
                             }
                         }
-                    }else{
+                        else{
+                            for(String arr : ref.keySet()) {
+                                if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x, y})){
+                                    for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                        Integer[] arr2 = ref.get(arr).get(idx);
+                                        if(Arrays.equals(arr2, new Integer[]{x-i,y-i})) {
+                                            saving.add(new Integer[]{x-i,y-i});
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else{
                         rightDown = false;
                     }
-                }catch(Exception e){}
+                }catch(Exception e){
+                    rightDown = false;
+                }
             }
-            else{
-            try{
-                if(rightDown && (bo.board[x+i][y+i]==null || !bo.board[x+i][y+i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x+i,y+i})) {
-                            saving.add(new Integer[]{x+i,y+i});
-                        }
-                    }
-                }
-                else
-                rightDown = false;
-            }catch(Exception e){}
-            try{
-                if(leftUp && (bo.board[x+i][y-i]==null || !bo.board[x+i][y-i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x+i,y-i})) {
-                            saving.add(new Integer[]{x+i,y-i});
-                        }
-                    }
-                }
-                else
-                leftUp = false;
-            }catch(Exception e){}
-            try{
-                if(rightUp && (bo.board[x-i][y+i]==null || !bo.board[x-i][y+i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x-i,y+i})) {
-                            saving.add(new Integer[]{x-i,y+i});
-                        }
-                    }
-                }
-                else
-                rightUp = false;
-            }catch(Exception e){}
-            try{
-                if(leftDown && (bo.board[x-i][y-i]==null || !bo.board[x-i][y-i].team.equals(this.team))){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x-i,y-i})) {
-                            saving.add(new Integer[]{x-i,y-i});
-                        }
-                    }
-                }
-                else
-                leftDown = false;
-            }catch(Exception e){}
-        } }
+        }
         return saving;
     }
 

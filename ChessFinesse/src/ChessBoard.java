@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EmptyStackException;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
@@ -72,12 +73,21 @@ public class ChessBoard extends JPanel {
     }
 
 
-    public  void onlyMove(HashMap<Integer[],ArrayList<Integer[]>> moves, int row, int col){
+    public  void onlyMove(HashMap<Integer[],LinkedList<Integer[]>> moves, int row, int col){
         for (Integer[] key : moves.keySet()) {
             if (key[0] == row && key[1] == col) {
                 for(Integer[] move : moves.get(key)) {
                         buttons[move[0]][move[1]].setBackground(Color.cyan);
                 }
+            }
+        }
+    }
+
+    public void highlightCheck(){
+        if(board.match.check){
+            for(Integer[] key: board.movemap.keySet()){
+                if(board.board[key[0]][key[1]] instanceof King)
+                buttons[key[0]][key[1]].setBackground(Color.red);
             }
         }
     }
@@ -89,19 +99,22 @@ public class ChessBoard extends JPanel {
         return e -> {
             if(board.valid(row, col)){
                 updateButtons();
+                highlightCheck();
                 showPossibleMoves(row, col);
                 return;
             }
             else if(board.validChoice(row, col)){
-                    int[]save = board.match.lastMoves;
-                    move(save, row, col);
-                    if(!board.isCheckMate())
-                    board.match.lastMoves = null;
-                    updateButtons();
+                int[]save = board.match.lastMoves;
+                move(save, row, col);
+                if(!board.isCheckMate())
+                board.match.lastMoves = null;
+                updateButtons();
+                highlightCheck();
                     return;
             }
             else{
                 updateButtons();
+                highlightCheck();
             }
         };
     }
