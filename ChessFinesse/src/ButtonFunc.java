@@ -8,7 +8,7 @@ import java.util.EmptyStackException;
 import javax.swing.JButton;
 
 public class ButtonFunc extends JButton {
-
+    
     
     
 
@@ -28,7 +28,7 @@ public class ButtonFunc extends JButton {
         }
     }
 
-    public boolean isValidMove(ChessBoard cb,int i,int j){
+    public boolean isValidMove(ChessGUI cb,int i,int j){
         if(getBackground().equals(Color.CYAN)){
             // cb.begin.oldMoves.push(new Move(cb.board.getButton(cb.begin.lastMoves[0], cb.begin.lastMoves[0]), cb.board.getButton(i, j)));
             return true;

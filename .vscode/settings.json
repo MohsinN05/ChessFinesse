@@ -1,3 +1,8 @@
 {
-    "editor.wordWrap": "on"
+    "editor.wordWrap": "on",
+    "java.jdt.ls.java.home": "",
+    "java.project.sourcePaths": [
+        "."
+    ],
+    "java.project.referencedLibraries": []
 }

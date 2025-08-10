@@ -5,65 +5,69 @@ import java.util.List;
 import java.util.*;
 
 
-abstract class Piece {
+abstract class Piece implements PictureHandler {
     boolean hasMoved;
     protected final String team;
     protected ImageIcon pic;
 
-    protected Piece(String t, String p){
-        team = t;
-        pic = resizeIcon(p);
-        hasMoved = false;
+    public static Piece createPawn(String t){
+        return new Pawn(t,false);
     }
 
-    protected Piece(String t,ImageIcon p,boolean M){
+    public static Piece createKing(String t){
+        return new King(t,false);
+    }
+
+    public static Piece createQueen(String t){
+        return new Queen(t,false);
+    }
+
+    public static Piece createBishop(String t){
+        return new Bishop(t,false);
+    }
+
+    public static Piece createKnight(String t){
+        return new Knight(t,false);
+    }
+
+    public static Piece createRook(String t){
+        return new Rook(t,false);
+    }
+
+    Piece(String t,String p,boolean M){
         team = t;
-        pic = p;
+        pic = PictureHandler.resizeIcon(p);
         hasMoved = M;
     }
 
-    public abstract Piece copy();
+    public abstract Map<String,LinkedList<Integer[]>> showPossibleMoves(ChessBoard bo, int x, int y);
 
-    public abstract Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y);
+    public abstract LinkedList<Integer[]> savingMoves(ChessBoard bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y);
 
-    public abstract LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y);
+    public void promote(ChessBoard pi,int x,int y){}
 
-    public void promote(ChessBoard cb,Pieces pi,int x,int y){}
-
+    public abstract String getPrefix();
 
     public void update(){
         hasMoved = true;
     }
-
-    public boolean isKing(){
-        return false;
-    }
-
-
-    protected ImageIcon resizeIcon(String path){
-        ImageIcon icon = new ImageIcon(path);
-        Image img = icon.getImage().getScaledInstance(55, 55, Image.SCALE_SMOOTH); 
-        return new ImageIcon(img);
-    }
 }
 
 class King extends Piece{
-    
-    public King(String t){
-        super(t, decideTeam(t));   
+    private final String pre = "K";
+    public King(String t, boolean m){
+        super(t, decideTeam(t),m);   
     }
 
-    public Piece copy(){
-        return null;
+    public String getPrefix(){
+        return pre;
     }
 
-    public void promote(ChessBoard cb,Pieces pi,int x,int y){}
-
-    public boolean[] castling(Pieces board,Set<LinkedList<Integer>> ref, int x, int y) {
+    private boolean[] castling(ChessBoard board,Set<LinkedList<Integer>> ref, int x, int y) {
         boolean queenSide = false, kingSide = false;
-        if(!hasMoved && !board.match.check){
+        if(!hasMoved && !board.check){
             for(int i = 1;y-i>=0;i++){
-                if(((y-i == 0 && board.board[x][y-i] != null && board.board[x][y-i].getClass().equals(Rook.class) & !board.board[x][y-i].hasMoved) || (y-i != 0 && board.board[x][y-i] == null)) && !ref.contains(Arrays.asList(x, y-i))){
+                if((y-i == 0 && board.board[x][y-i] != null && board.board[x][y-i].getClass().equals(Rook.class) && !board.board[x][y-i].hasMoved) || (y-i != 0 && board.board[x][y-i] == null && ((y-i == 1 && board.turn.equals("White")) || !ref.contains(Arrays.asList(x, y-i))))){
                     queenSide = true;
                 }
                 else{
@@ -72,7 +76,7 @@ class King extends Piece{
                 }
             }
             for(int i = 1;y+i<8;i++){
-                if(((y+i == 7 && board.board[x][y+i] != null && board.board[x][y+i].getClass().equals(Rook.class) & !board.board[x][y+i].hasMoved) || (y+i != 7 && board.board[x][y+i] == null)) && !ref.contains(Arrays.asList(x, y+i))){
+                if((y+i == 7 && board.board[x][y+i] != null && board.board[x][y+i].getClass().equals(Rook.class) && !board.board[x][y+i].hasMoved) || (y+i != 7 && board.board[x][y+i] == null && ((y+i == 6 && board.turn.equals("Black")) || !ref.contains(Arrays.asList(x, y+i))))){
                     kingSide = true;
                 }
                 else{
@@ -84,28 +88,43 @@ class King extends Piece{
         return new boolean[]{queenSide, kingSide};
     }
 
+    private boolean foundIt(Set<Integer[]> save, int x ,int y){
+        for(Integer[]i:save){
+            if(Arrays.equals(i,new Integer[]{x,y}))
+            return true;
+        }
+        return false;
+    }
+
+    private Set<LinkedList<Integer>> coordinateOfChecking(Set<Integer[]> a) {
+        Set<LinkedList<Integer>> listSet = new HashSet<>();
+        for (Integer[] i : a) {
+                LinkedList<Integer> list = new LinkedList<>(Arrays.asList(i));
+                listSet.add(list);
+        }
+        return listSet;
+    }
     
-    
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(ChessBoard bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
         moves.put("Neighbor", new LinkedList<>());
-        if(team.equals(bo.match.turn)){
-            HashMap<String,LinkedList<Integer[]>> restrain = bo.LimitMoves();
-            bo.shiftBoard();
-            HashMap<Integer[],LinkedList<Integer[]>> s1 = bo.SearchForMoves(restrain);
-            bo.shiftBoard();
+        if(team.equals(bo.turn())){
+            HashMap<Integer[],LinkedList<Integer[]>> s1 = bo.SearchForMoves();
             Set<Integer[]> save = new HashSet<>();
             for (LinkedList<Integer[]> list : s1.values()) {
-                save.addAll(list);
+                for(Integer[] l:list){
+                     l[0] = 7 - l[0];
+                    l[1] = 7 - l[1];
+                    save.add(new Integer[]{l[0],l[1]});
+                }
             }
-            Set<LinkedList<Integer>> a = bo.coordinateOfChecking(save);
             for(int i = 1;Math.abs(i)<2;i--){
                 for(int j = 1;Math.abs(j)<2;j--){
                     if(i == 0 && j == 0)continue;
                     try{
-                        if(!a.contains(Arrays.asList(x+i, y+j))){
+                        if(!foundIt(save, x+i, y+j)){
                             if((bo.board[x+i][y+j]==null)){
                                 moves.get("Defence").add(new Integer[]{x+i,y+j});
                             }
@@ -117,8 +136,8 @@ class King extends Piece{
                     }catch(Exception e){}      
                 }
             }
-            if(!bo.match.check){
-                boolean[] castling = castling(bo, a, x, y);
+            if(!bo.check){
+                boolean[] castling = castling(bo, coordinateOfChecking(save), x, y);
                 if(this.team.equals("White")){
                     if(castling[0]){
                         moves.put("QueenSide", new LinkedList<>());
@@ -159,7 +178,7 @@ class King extends Piece{
         return moves; 
     }
 
-    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref , int x, int y){
+    public LinkedList<Integer[]> savingMoves(ChessBoard bo, HashMap<String,LinkedList<Integer[]>> ref , int x, int y){
         Map<String,LinkedList<Integer[]>> moves = showPossibleMoves(bo, x, y);
         LinkedList<Integer[]> saving = new LinkedList<>();
         saving.addAll(moves.get("Defence"));
@@ -167,15 +186,7 @@ class King extends Piece{
         return saving;
     }
 
-
-    public boolean isKing(){
-        return true;
-    }
-
-
-    public void castling(){}
-
-     static String decideTeam(String team){
+    static String decideTeam(String team){
         if(team.equals("White"))
         return "ChessFinesse//Pics&Vids//Pics//w_king_1x.png";
         return "ChessFinesse//Pics&Vids//Pics//b_king_1x.png";
@@ -183,28 +194,47 @@ class King extends Piece{
 }
 
 class Pawn extends Piece{
+    private final String pre = "";
 
-    public Pawn(String t){
-        super(t, decideTeam(t));   
-    }
-
-    public Pawn(String t,ImageIcon p,boolean M){
-        super(t, p,M);
-    }
-
-
-    public Piece copy(){
-        return new Pawn(this.team,this.pic,this.hasMoved);
+    public Pawn(String t,boolean m){
+        super(t, decideTeam(t),m);   
     }
     
-      
-     static String decideTeam(String team){
+    public String getPrefix(){
+        return pre;
+    }
+     
+    static String decideTeam(String team){
         if(team.equals("White"))
         return "ChessFinesse//Pics&Vids//Pics//w_pawn_1x.png";
         return "ChessFinesse//Pics&Vids//Pics//b_pawn_1x.png";
     }
 
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
+    private boolean leftEnpassant(ChessBoard bo, int x, int y){
+        if(bo.board[x-1][y-1]==null && bo.board[x][y-1]!=null && bo.board[x][y-1] instanceof Pawn && !bo.board[x][y-1].team.equals(this.team)){
+            int[] last = bo.records.decodeNotation(bo.notTurn());
+            if(last != null && bo.getButton(last[2], last[3]) instanceof Pawn){
+                if(last[2] == (x) && last[3] == y-1 && last[2]-last[0]==2){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean rightEnpassant(ChessBoard bo, int x, int y){
+        if(bo.board[x-1][y+1]==null && bo.board[x][y+1]!=null && bo.board[x][y+1] instanceof Pawn && !bo.board[x][y+1].team.equals(this.team)){
+            int[] last = bo.records.decodeNotation(bo.notTurn());
+            if(last != null && bo.getButton(last[2], last[3]) instanceof Pawn){
+                if(last[2] == (x) && last[3] == y+1 && last[2]-last[0]==2){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(ChessBoard bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
@@ -223,6 +253,9 @@ class Pawn extends Piece{
         try{
             if(x-1 >= 0 && y+1<8){
                 if(bo.board[x-1][y+1]==null || bo.board[x-1][y+1].team.equals(this.team)){
+                    if(rightEnpassant(bo, x, y))
+                    moves.get("Attack").add(new Integer[]{x-1,y+1});
+                    else
                     moves.get("Neighbor").add(new Integer[]{x-1,y+1});
                 }
                 else{
@@ -238,6 +271,9 @@ class Pawn extends Piece{
         try{
             if(x-1 >= 0 && y-1>=0){
                 if(bo.board[x-1][y-1]==null || bo.board[x-1][y-1].team.equals(this.team)){
+                    if(leftEnpassant(bo, x, y))
+                    moves.get("Attack").add(new Integer[]{x-1,y-1});
+                    else
                     moves.get("Neighbor").add(new Integer[]{x-1,y-1});
                 }
                 else{
@@ -253,7 +289,7 @@ class Pawn extends Piece{
         return moves;
     }
 
-    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
+    public LinkedList<Integer[]> savingMoves(ChessBoard bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
         LinkedList<Integer[]> saving = new LinkedList<>();
         int i = 1;
         while((i<=1+(hasMoved?0:1))&&(x-i>=0)){
@@ -284,22 +320,20 @@ class Pawn extends Piece{
             i++;
         }
         try{
-            if(bo.board[x-1][y+1]!=null && !bo.board[x-1][y+1].team.equals(this.team)){
-                if(ref.get("Attack") != null && ref.get("Attack").size() > 0){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x-1,y+1})) {
-                            saving.add(new Integer[]{x-1,y+1});
-                        }
+            if(ref.get("Attack") != null && ref.get("Attack").size() > 0){
+                for (Integer[] arr : ref.get("Attack")) {
+                    if((Arrays.equals(arr, new Integer[]{x-1,y+1}) && bo.board[x-1][y+1]!=null && !bo.board[x-1][y+1].team.equals(this.team)) || (rightEnpassant(bo, x, y) && Arrays.equals(arr, new Integer[]{x,y+1}))) {
+                        saving.add(new Integer[]{x-1,y+1});
                     }
                 }
-                else{
-                    for(String arr : ref.keySet()) {
-                        if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x,y})){
-                            for (int idx = 1; idx < ref.get(arr).size(); idx++) {
-                                    Integer[] arr2 = ref.get(arr).get(idx);
-                                if(Arrays.equals(arr2, new Integer[]{x-1,y+1})) {
-                                    saving.add(new Integer[]{x-1,y+1});
-                                }
+            }
+            else{
+                for(String arr : ref.keySet()) {
+                    if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x,y})){
+                        for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                Integer[] arr2 = ref.get(arr).get(idx);
+                            if(Arrays.equals(arr2, new Integer[]{x-1,y+1}) && ((bo.board[x-1][y+1]!=null && !bo.board[x-1][y+1].team.equals(this.team)) || rightEnpassant(bo, x, y))) {
+                                saving.add(new Integer[]{x-1,y+1});
                             }
                         }
                     }
@@ -307,22 +341,20 @@ class Pawn extends Piece{
             }
         }catch(Exception e){}
         try{
-            if(bo.board[x-1][y-1]!=null && !bo.board[x-1][y-1].team.equals(this.team)){
-                if(ref.get("Attack") != null && ref.get("Attack").size() > 0){
-                    for (Integer[] arr : ref.get("Attack")) {
-                        if(Arrays.equals(arr, new Integer[]{x-1,y-1})) {
-                            saving.add(new Integer[]{x-1,y-1});
-                        }
+            if(ref.get("Attack") != null && ref.get("Attack").size() > 0){
+                for (Integer[] arr : ref.get("Attack")) {
+                    if((Arrays.equals(arr, new Integer[]{x-1,y-1}) && bo.board[x-1][y-1]!=null && !bo.board[x-1][y-1].team.equals(this.team)) || (leftEnpassant(bo, x, y) && Arrays.equals(arr, new Integer[]{x,y-1}))) {
+                        saving.add(new Integer[]{x-1,y-1});
                     }
                 }
-                else{
-                    for(String arr : ref.keySet()) {
-                        if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x,y})){
-                            for (int idx = 1; idx < ref.get(arr).size(); idx++) {
-                                        Integer[] arr2 = ref.get(arr).get(idx);
-                                if(Arrays.equals(arr2, new Integer[]{x-1,y-1})) {
-                                    saving.add(new Integer[]{x-1,y-1});
-                                }
+            }
+            else{
+                for(String arr : ref.keySet()) {
+                    if(ref.get(arr) != null && ref.get(arr).size() > 1 && Arrays.equals(ref.get(arr).getFirst(), new Integer[]{x,y})){
+                        for (int idx = 1; idx < ref.get(arr).size(); idx++) {
+                                Integer[] arr2 = ref.get(arr).get(idx);
+                            if(Arrays.equals(arr2, new Integer[]{x-1,y-1}) && ((bo.board[x-1][y-1]!=null && !bo.board[x-1][y-1].team.equals(this.team)) || leftEnpassant(bo, x, y))) {
+                                saving.add(new Integer[]{x-1,y-1});
                             }
                         }
                     }
@@ -332,38 +364,65 @@ class Pawn extends Piece{
         return saving;
     }
 
-    public void promote(ChessBoard cb,Pieces pi,int x,int y){
-        pawnPromotion(cb,pi,x,y);
+    private Piece toQueen(){
+        return new Queen(team,true);
     }
-    private void pawnPromotion(ChessBoard cb,Pieces pi,int x,int y){
-        cb.safe.promo = new Promotion(cb,team,pi,x,y);
+
+    private Piece toKnight(){
+        return new Knight(team,true);
+    }
+
+    private Piece toBishop(){
+        return new Bishop(team,true);
+    }
+
+    private Piece toRook(){
+        return new Rook(team,true);
+    }
+
+    public void promote(ChessBoard pi,int x,int y){
+        new Promotion(pi.cboard.parent,team, (Integer index) ->{
+            pi.board[x][y] = handleDialogResult(index);
+        });
+        
+        
+    }
+
+    private Piece handleDialogResult(int index){
+        if(index == 0){
+            return toQueen();
+        }
+        else if(index == 1){
+            return toKnight();
+        }
+        else if(index == 2){
+            return toBishop();
+        }
+        else if(index == 3){
+            return toRook();
+        }
+        return null;
     }
 }
 
-class Knight extends Pawn{
-    public Knight(String t){
-        super(t);
-        pic = resizeIcon(decideTeam(t));   
+class Knight extends Piece{
+    private final String pre = "N";
+
+    public Knight(String t, boolean h){
+        super(t, decideTeam(t),h);
     }
 
-    public Knight(String t,ImageIcon p,boolean M){
-        super(t, p,M);
-    }
-
-
-    public Piece copy(){
-        return new Knight(this.team,this.pic,this.hasMoved);
+    public String getPrefix(){
+        return pre;
     }
         
-     static String decideTeam(String team){
+    static String decideTeam(String team){
         if(team.equals("White"))
         return "ChessFinesse//Pics&Vids//Pics//w_knight_1x.png";
         return "ChessFinesse//Pics&Vids//Pics//b_knight_1x.png";
     }
 
-    public void promote(ChessBoard cb,Pieces pi,int x,int y){}
-
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(ChessBoard bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
@@ -393,7 +452,7 @@ class Knight extends Pawn{
         return moves;
     }
 
-    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
+    public LinkedList<Integer[]> savingMoves(ChessBoard bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
         LinkedList<Integer[]> saving = new LinkedList<>();
         for(int i = 2;Math.abs(i)<=2;i--){
             for(int j = 2;Math.abs(j)<=2;j--){
@@ -425,34 +484,26 @@ class Knight extends Pawn{
         }
         return saving;
     }
-
 }
 
-class Queen extends Pawn{
-    public Queen(String t){
-        super(t);
-        pic = resizeIcon(decideTeam(t));   
+class Queen extends Piece{
+    private final String pre = "Q";
+
+    public String getPrefix(){
+        return pre;
     }
 
-    public Queen(String t,ImageIcon p,boolean M){
-        super(t, p,M);
-    }
-
-
-    public Piece copy(){
-        return new Queen(this.team,this.pic,this.hasMoved);
+    public Queen(String t,boolean M){
+        super(t, decideTeam(t),M);
     }
         
-     static String decideTeam(String team){
+    static String decideTeam(String team){
         if(team.equals("White"))
         return "ChessFinesse//Pics&Vids//Pics//w_queen_1x.png";
         return "ChessFinesse//Pics&Vids//Pics//b_queen_1x.png";
     }
 
-
-    public void promote(ChessBoard cb,Pieces pi,int x,int y){}
-
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(ChessBoard bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
@@ -501,6 +552,8 @@ class Queen extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(hR);
+                                    hR.clear();
                                 }
                             }
                             else{
@@ -567,6 +620,8 @@ class Queen extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(hL);
+                                    hL.clear();
                                 }
                             }
                             else{
@@ -631,6 +686,8 @@ class Queen extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(vU);
+                                    vU.clear();
                                 }
                             }
                             else{
@@ -696,6 +753,8 @@ class Queen extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(vD);
+                                    vD.clear();
                                 }
                             }
                             else{
@@ -760,6 +819,8 @@ class Queen extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(rU);
+                                    rU.clear();
                                 }
                             }
                             else{
@@ -825,6 +886,8 @@ class Queen extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(lD);
+                                    lD.clear();
                                 }
                             }
                             else{
@@ -891,6 +954,8 @@ class Queen extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(lU);
+                                    lU.clear();
                                 }
                             }
                             else{
@@ -957,6 +1022,8 @@ class Queen extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(rD);
+                                    rD.clear();
                                 }
                             }
                             else{
@@ -992,7 +1059,7 @@ class Queen extends Pawn{
         return moves;
     }
 
-    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
+    public LinkedList<Integer[]> savingMoves(ChessBoard bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
         LinkedList<Integer[]> saving = new LinkedList<>();
         boolean vUp=true,vDown=true,hLeft=true,hRight = true;
         boolean leftUp=true,leftDown=true,rightUp=true,rightDown = true;
@@ -1253,37 +1320,29 @@ class Queen extends Pawn{
                     rightDown = false;
                 }
             }
-        }
-        
+        } 
         return saving;
     }
-
 }
 
-class Rook extends Pawn{
-    public Rook(String t){
-        super(t);
-        pic = resizeIcon(decideTeam(t));   
+class Rook extends Piece{
+    private final String pre = "R";
+    
+    public String getPrefix(){
+        return pre;
     }
 
-    public Rook(String t,ImageIcon p,boolean M){
-        super(t, p,M);
-    }
-
-
-    public Piece copy(){
-        return new Rook(this.team,this.pic,this.hasMoved);
+    public Rook(String t,boolean M){
+        super(t, decideTeam(t),M);
     }
         
-     static String decideTeam(String team){
+    static String decideTeam(String team){
         if(team.equals("White"))
         return "ChessFinesse//Pics&Vids//Pics//w_rook_1x.png";
         return "ChessFinesse//Pics&Vids//Pics//b_rook_1x.png";
     }
 
-    public void promote(ChessBoard cb,Pieces pi,int x,int y){}
-
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(ChessBoard bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
@@ -1329,6 +1388,8 @@ class Rook extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(hR);
+                                    hR.clear();
                                 }
                             }
                             else{
@@ -1395,6 +1456,8 @@ class Rook extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(hL);
+                                    hL.clear();
                                 }
                             }
                             else{
@@ -1459,6 +1522,8 @@ class Rook extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(vU);
+                                    vU.clear();
                                 }
                             }
                             else{
@@ -1524,6 +1589,8 @@ class Rook extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(vD);
+                                    vD.clear();
                                 }
                             }
                             else{
@@ -1558,7 +1625,7 @@ class Rook extends Pawn{
         return moves;
     }
 
-    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
+    public LinkedList<Integer[]> savingMoves(ChessBoard bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
         LinkedList<Integer[]> saving = new LinkedList<>();
         boolean vUp=true,vDown=true,hLeft=true,hRight = true;
         for(int i = 1;i<8;i++){
@@ -1690,25 +1757,20 @@ class Rook extends Pawn{
                     vDown = false;
                 }
             }
-    }
+        }
         return saving;
     }
-
 }
 
-class Bishop extends Pawn{
-
-    public Bishop(String t){
-        super(t);
-        pic = resizeIcon(decideTeam(t));   
+class Bishop extends Piece{
+    private final String pre = "B";
+    
+    public String getPrefix(){
+        return pre;
     }
 
-    public Bishop(String t,ImageIcon p,boolean M){
-        super(t, p,M);
-    }
-
-    public Piece copy(){
-        return new Bishop(this.team,this.pic,this.hasMoved);
+    public Bishop(String t,boolean M){
+        super(t, decideTeam(t),M);
     }
         
     static String decideTeam(String team){
@@ -1717,9 +1779,7 @@ class Bishop extends Pawn{
         return "ChessFinesse//Pics&Vids//Pics//b_bishop_1x.png";
     }
 
-    public void promote(ChessBoard cb,Pieces pi,int x,int y){}
-
-    public Map<String,LinkedList<Integer[]>> showPossibleMoves(Pieces bo, int x, int y){
+    public Map<String,LinkedList<Integer[]>> showPossibleMoves(ChessBoard bo, int x, int y){
         Map<String,LinkedList<Integer[]>> moves = new HashMap<>();
         moves.put("Defence", new LinkedList<>());
         moves.put("Attack", new LinkedList<>());
@@ -1765,6 +1825,8 @@ class Bishop extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(rU);
+                                    rU.clear();
                                 }
                             }
                             else{
@@ -1830,6 +1892,8 @@ class Bishop extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(lD);
+                                    lD.clear();
                                 }
                             }
                             else{
@@ -1896,6 +1960,8 @@ class Bishop extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(lU);
+                                    lU.clear();
                                 }
                             }
                             else{
@@ -1962,6 +2028,8 @@ class Bishop extends Pawn{
                                             if(found) break;    
                                         }        
                                     }
+                                    moves.get("Restrict").addAll(rD);
+                                    rD.clear();
                                 }
                             }
                             else{
@@ -1997,7 +2065,7 @@ class Bishop extends Pawn{
         return moves;
     }
 
-    public LinkedList<Integer[]> savingMoves(Pieces bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
+    public LinkedList<Integer[]> savingMoves(ChessBoard bo, HashMap<String,LinkedList<Integer[]>> ref, int x, int y){
         LinkedList<Integer[]> saving = new LinkedList<>();
         boolean leftUp=true,leftDown=true,rightUp=true,rightDown = true;
         for(int i = 1;i<8;i++){
@@ -2132,5 +2200,4 @@ class Bishop extends Pawn{
         }
         return saving;
     }
-
 }
